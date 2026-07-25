@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Restrained, near-monochrome theme (no bright colors). A single desaturated
+ * slate-blue accent; semantic positive/negative kept muted (SHAP up/down).
+ */
+:root {
+  --background: 210 20% 99%;
+  --foreground: 215 25% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 25% 15%;
+  --muted: 215 20% 96%;
+  --muted-foreground: 215 12% 45%;
+  --border: 215 18% 90%;
+  --input: 215 18% 88%;
+  --ring: 215 30% 55%;
+  --accent: 215 45% 42%;
+  --accent-foreground: 0 0% 100%;
+  --positive: 158 42% 38%;
+  --negative: 4 55% 50%;
+  --warning: 35 55% 45%;
+  --radius: 0.6rem;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+:root[data-theme="dark"],
+.dark {
+  --background: 220 27% 8%;
+  --foreground: 210 20% 92%;
+  --card: 220 24% 11%;
+  --card-foreground: 210 20% 92%;
+  --muted: 220 18% 16%;
+  --muted-foreground: 215 14% 62%;
+  --border: 220 16% 20%;
+  --input: 220 16% 22%;
+  --ring: 215 40% 60%;
+  --accent: 210 50% 58%;
+  --accent-foreground: 220 27% 8%;
+  --positive: 158 40% 48%;
+  --negative: 4 60% 60%;
+  --warning: 35 60% 58%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: 220 27% 8%;
+    --foreground: 210 20% 92%;
+    --card: 220 24% 11%;
+    --card-foreground: 210 20% 92%;
+    --muted: 220 18% 16%;
+    --muted-foreground: 215 14% 62%;
+    --border: 220 16% 20%;
+    --input: 220 16% 22%;
+    --ring: 215 40% 60%;
+    --accent: 210 50% 58%;
+    --accent-foreground: 220 27% 8%;
+    --positive: 158 40% 48%;
+    --negative: 4 60% 60%;
+    --warning: 35 60% 58%;
+  }
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numerals for all metric/score displays. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
