@@ -5,18 +5,39 @@ import { getAuth } from "firebase-admin/auth";
 /**
  * Server-only Firebase Admin, used by the proxy to verify the caller's ID token
  * before spending backend credits. If admin credentials are not configured we
- * fall back to "unverified" mode (dev only) — the proxy logs a loud warning.
+ * fall back to "unverified" mode (dev only). If they ARE configured but invalid
+ * (e.g. a malformed private key), we surface the real error instead of crashing.
  */
 let app: App | null = null;
+let lastInitError: string | null = null;
+
+export const getAdminInitError = () => lastInitError;
+
+/** Normalise a pasted private key: strip wrapping quotes, unescape \n. */
+function normalizeKey(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  let k = raw.trim();
+  if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+    k = k.slice(1, -1);
+  }
+  return k.replace(/\\n/g, "\n");
+}
 
 function getAdminApp(): App | null {
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKey = normalizeKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
   if (!projectId || !clientEmail || !privateKey) return null;
   if (app) return app;
-  app = getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
-  return app;
+  try {
+    app = getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+    lastInitError = null;
+    return app;
+  } catch (e) {
+    lastInitError = (e as Error).message;
+    console.error("[proxy] Firebase Admin init failed:", lastInitError);
+    return null;
+  }
 }
 
 export interface VerifiedUser {
@@ -27,14 +48,15 @@ export interface VerifiedUser {
 
 /**
  * Verify a `Bearer <idToken>` Authorization header. Returns the user, or null
- * only when a token was present but invalid. When admin is unconfigured we
- * return an unverified stub so local dev works without a service account.
+ * when access should be denied. When admin init failed, `getAdminInitError()`
+ * is set so the caller can return a 503 (misconfig) instead of a 401.
  */
 export async function verifyRequest(authHeader: string | null): Promise<VerifiedUser | null> {
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
   const adminApp = getAdminApp();
 
   if (!adminApp) {
+    if (lastInitError) return null; // configured but broken → caller returns 503
     if (process.env.NODE_ENV === "production") {
       console.error("[proxy] FIREBASE_ADMIN_* not set in production — refusing.");
       return null;
