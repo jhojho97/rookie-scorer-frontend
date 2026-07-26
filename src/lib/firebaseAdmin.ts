@@ -23,14 +23,50 @@ function normalizeKey(raw: string | undefined): string | undefined {
   return k.replace(/\\n/g, "\n");
 }
 
-function getAdminApp(): App | null {
+interface Creds {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+}
+
+/**
+ * Resolve credentials from either:
+ *  1. FIREBASE_SERVICE_ACCOUNT — the ENTIRE service-account JSON (raw or base64).
+ *     Recommended: JSON.parse handles the private key's newlines, so there's
+ *     nothing to mangle when pasting into Vercel.
+ *  2. The three FIREBASE_ADMIN_* fields (with best-effort key normalisation).
+ */
+function resolveCreds(): Creds | null {
+  const blob = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (blob && blob.trim()) {
+    try {
+      const text = blob.trim().startsWith("{")
+        ? blob
+        : Buffer.from(blob, "base64").toString("utf8");
+      const o = JSON.parse(text) as Record<string, string>;
+      if (o.project_id && o.client_email && o.private_key) {
+        return { projectId: o.project_id, clientEmail: o.client_email, privateKey: o.private_key };
+      }
+      lastInitError = "FIREBASE_SERVICE_ACCOUNT is missing project_id/client_email/private_key.";
+      return null;
+    } catch (e) {
+      lastInitError = `FIREBASE_SERVICE_ACCOUNT is not valid JSON: ${(e as Error).message}`;
+      return null;
+    }
+  }
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
   const privateKey = normalizeKey(process.env.FIREBASE_ADMIN_PRIVATE_KEY);
   if (!projectId || !clientEmail || !privateKey) return null;
+  return { projectId, clientEmail, privateKey };
+}
+
+function getAdminApp(): App | null {
+  const creds = resolveCreds();
+  if (!creds) return null;
   if (app) return app;
   try {
-    app = getApps()[0] ?? initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
+    app = getApps()[0] ?? initializeApp({ credential: cert(creds) });
     lastInitError = null;
     return app;
   } catch (e) {
