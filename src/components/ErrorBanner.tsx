@@ -15,7 +15,11 @@ export function ErrorBanner({ error }: { error: unknown }) {
       )}
       <div>
         {isCold ? (
-          <p>Backend is starting. This can take around one minute — please try again.</p>
+          <p>
+            The backend didn&apos;t respond in time — it may be waking from sleep (first
+            request can take ~1 minute), or scoring is taking longer than usual.
+            It&apos;s likely warm now, so please try again.
+          </p>
         ) : (
           <p>{msg}</p>
         )}
