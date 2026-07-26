@@ -10,8 +10,20 @@ import { getAuth } from "firebase-admin/auth";
  */
 let app: App | null = null;
 let lastInitError: string | null = null;
+let lastVerifyError: string | null = null;
 
 export const getAdminInitError = () => lastInitError;
+export const getLastVerifyError = () => lastVerifyError;
+/** The admin's project id, so callers can diagnose token/project mismatches. */
+export const getAdminProjectId = () =>
+  process.env.FIREBASE_ADMIN_PROJECT_ID ||
+  (() => {
+    try {
+      const b = process.env.FIREBASE_SERVICE_ACCOUNT;
+      if (b) return (JSON.parse(b.trim().startsWith("{") ? b : Buffer.from(b, "base64").toString("utf8")) as { project_id?: string }).project_id;
+    } catch {}
+    return undefined;
+  })();
 
 /** Normalise a pasted private key: strip wrapping quotes, unescape \n. */
 function normalizeKey(raw: string | undefined): string | undefined {
@@ -101,12 +113,17 @@ export async function verifyRequest(authHeader: string | null): Promise<Verified
     return { uid: token ? "dev-token" : "anonymous", verified: false };
   }
 
-  if (!token) return null;
+  if (!token) {
+    lastVerifyError = "No Bearer token was sent.";
+    return null;
+  }
   try {
     const decoded = await getAuth(adminApp).verifyIdToken(token);
+    lastVerifyError = null;
     return { uid: decoded.uid, email: decoded.email, verified: true };
   } catch (e) {
-    console.warn("[proxy] ID-token verification failed:", (e as Error).message);
+    lastVerifyError = (e as Error).message;
+    console.warn("[proxy] ID-token verification failed:", lastVerifyError);
     return null;
   }
 }
