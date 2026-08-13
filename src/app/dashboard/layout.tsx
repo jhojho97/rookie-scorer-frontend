@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { Footer } from "@/components/layout/Footer";
 import { Skeleton } from "@/components/ui/misc";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -37,7 +36,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar />
         <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
-      <Footer />
     </div>
   );
 }
