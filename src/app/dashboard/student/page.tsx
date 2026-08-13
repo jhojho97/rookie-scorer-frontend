@@ -1,60 +1,44 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBatchJob } from "@/hooks/useBatchJob";
 import { UploadCard } from "@/components/UploadCard";
-import { ProgressTimeline, PREDICT_STEPS } from "@/components/ProgressTimeline";
 import { ReportCard } from "@/components/ReportCard";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/misc";
 
 /**
  * Single-candidate scoring runs through the backend's async JOB flow (submit ->
- * job_id -> poll /jobs). The heavy work happens on Render in the background, so
- * we only ever make quick requests — this sidesteps Vercel's 60s function limit
- * that a synchronous /predict would hit for a real (multi-LLM-call) scoring.
+ * poll /jobs). The heavy work happens on the server, so we only make quick calls
+ * and sidestep Vercel's function time limit. Per request, we surface a single
+ * "Running" state until the report is ready — no intermediate statuses.
  */
 export default function StudentDashboard() {
   const { user } = useAuth();
   const { submit, job, reset } = useBatchJob();
   const [cv, setCv] = useState<File | null>(null);
   const [jmp, setJmp] = useState<File | null>(null);
-  const [step, setStep] = useState(0);
 
   const running = submit.isPending || job.data?.status === "running";
   const done = job.data?.status === "done";
   const result = job.data?.results?.[0];
-  const jobError = job.data?.status === "error" ? job.data?.reason : undefined;
-  const resultError = result?.status === "error" ? result.reason : undefined;
-
-  // Pace the timeline while the job runs (poll-driven), then jump to done.
-  useEffect(() => {
-    if (!running) return;
-    setStep((s) => Math.max(s, 1));
-    const id = setInterval(() => setStep((s) => Math.min(s + 1, PREDICT_STEPS.length - 1)), 2500);
-    return () => clearInterval(id);
-  }, [running]);
-
-  useEffect(() => {
-    if (done) setStep(PREDICT_STEPS.length);
-  }, [done]);
+  const failed = submit.isError || job.data?.status === "error" || result?.status === "error";
+  const failMsg =
+    (submit.error as Error | undefined)?.message ||
+    result?.reason ||
+    job.data?.reason ||
+    "Scoring failed.";
+  const showReport = done && result && result.status !== "error";
 
   function onScore() {
     if (!cv) return;
-    setStep(1);
     submit.mutate([{ id: "me", name: "Your profile", cv, jmp }]);
   }
-
-  function startOver() {
-    reset();
-    setStep(0);
-  }
-
-  const showReport = done && result && result.status !== "error";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -67,7 +51,7 @@ export default function StudentDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {!done && (
+          {!done && !running && (
             <Card>
               <CardHeader>
                 <CardTitle>Upload documents</CardTitle>
@@ -75,37 +59,23 @@ export default function StudentDashboard() {
               <CardContent className="space-y-4">
                 <UploadCard label="CV" file={cv} onChange={setCv} />
                 <UploadCard label="Job-market paper" optional file={jmp} onChange={setJmp} />
-                <Button onClick={onScore} disabled={!cv || running} className="w-full">
+                <Button onClick={onScore} disabled={!cv} className="w-full">
                   <Sparkles className="h-4 w-4" />
-                  {running ? "Scoring…" : "Score my profile"}
+                  Score my profile
                 </Button>
-                {submit.isError && <ErrorBanner error={submit.error} />}
-                {job.isError && <ErrorBanner error={job.error} />}
+                {failed && <ErrorBanner error={new Error(failMsg)} />}
               </CardContent>
             </Card>
           )}
 
           {running && (
             <Card>
-              <CardHeader>
-                <CardTitle>Prediction progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ProgressTimeline active={step} />
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Scoring runs on the server — this can take up to a minute. You can leave this tab open.
+              <CardContent className="flex flex-col items-center gap-3 py-12">
+                <Spinner className="h-6 w-6 text-accent" />
+                <p className="text-sm font-medium">Running…</p>
+                <p className="text-xs text-muted-foreground">
+                  Scoring on the server — this can take up to a minute or two. You can leave this tab open.
                 </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {done && !showReport && (
-            <Card>
-              <CardContent className="space-y-4 p-5">
-                <ErrorBanner error={new Error(resultError || jobError || "Scoring failed.")} />
-                <Button variant="outline" size="sm" onClick={startOver}>
-                  Try again
-                </Button>
               </CardContent>
             </Card>
           )}
@@ -113,12 +83,23 @@ export default function StudentDashboard() {
           {showReport && result && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               <div className="mb-4 flex justify-end">
-                <Button variant="outline" size="sm" onClick={startOver}>
+                <Button variant="outline" size="sm" onClick={reset}>
                   Score another
                 </Button>
               </div>
               <ReportCard result={result} />
             </motion.div>
+          )}
+
+          {done && !showReport && (
+            <Card>
+              <CardContent className="space-y-4 p-5">
+                <ErrorBanner error={new Error(failMsg)} />
+                <Button variant="outline" size="sm" onClick={reset}>
+                  Try again
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
 

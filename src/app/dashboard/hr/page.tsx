@@ -1,7 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Download, Play, RotateCcw, X } from "lucide-react";
 import type { PredictionResult, CandidateInput } from "@/types";
+import { publicEnv } from "@/lib/env";
 import { useBatchJob } from "@/hooks/useBatchJob";
 import { CandidateRows, emptyRow } from "@/components/hr/CandidateRows";
 import { CandidateTable } from "@/components/CandidateTable";
@@ -19,19 +20,21 @@ export default function HrDashboard() {
   const [rows, setRows] = useState<CandidateInput[]>([emptyRow(), emptyRow()]);
   const [selected, setSelected] = useState<PredictionResult | null>(null);
 
+  const maxBatch = publicEnv.maxBatch;
   const validCount = rows.filter((r) => r.cv).length;
-  const running = job.data?.status === "running" || submit.isPending;
-  const done = job.data?.status === "done" || job.data?.status === "error";
   const results = job.data?.results ?? [];
 
-  const [pctDone, total] = useMemo(() => {
-    const [d, t] = (job.data?.progress ?? "0/0").split("/").map(Number);
-    return [t ? (d / t) * 100 : 0, t];
-  }, [job.data?.progress]);
+  // Simple state machine: after submitting we only surface a single "Running"
+  // state until the results (or an error) are ready — no intermediate statuses.
+  const failed = submit.isError || job.isError || job.data?.status === "error";
+  const succeeded = job.data?.status === "done";
+  const waitingFirstPoll = submit.isSuccess && !job.data && !job.isError;
+  const running = !failed && !succeeded && (submit.isPending || waitingFirstPoll || job.data?.status === "running");
+  const finished = succeeded || failed;
 
   function onSubmit() {
     const usable = rows.filter((r) => r.cv);
-    if (!usable.length) return;
+    if (!usable.length || usable.length > maxBatch) return;
     submit.mutate(usable);
   }
 
@@ -41,24 +44,32 @@ export default function HrDashboard() {
     setSelected(null);
   }
 
+  const errorMsg =
+    (submit.error as Error | undefined)?.message ||
+    (job.error as Error | undefined)?.message ||
+    job.data?.reason ||
+    "Batch scoring failed.";
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Candidate batch scoring</h1>
           <p className="text-sm text-muted-foreground">
-            Add candidates (CV required, JMP optional), then run the batch and rank the results.
+            Add candidates (CV required, JMP optional) — up to {maxBatch} per batch — then run and rank.
           </p>
         </div>
-        {done && (
+        {finished && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => downloadCsv("candidate_scores.csv", resultsToCsv(results))}
-            >
-              <Download className="h-4 w-4" /> Export CSV
-            </Button>
+            {succeeded && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => downloadCsv("candidate_scores.csv", resultsToCsv(results))}
+              >
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+            )}
             <Button variant="subtle" size="sm" onClick={onReset}>
               <RotateCcw className="h-4 w-4" /> New batch
             </Button>
@@ -68,38 +79,35 @@ export default function HrDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-4">
         <div className="space-y-6 lg:col-span-3">
-          {!done && (
+          {!running && !finished && (
             <Card>
               <CardHeader>
                 <CardTitle>Candidates ({validCount} ready)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <CandidateRows rows={rows} setRows={setRows} disabled={running} />
-                <div className="flex items-center gap-3">
-                  <Button onClick={onSubmit} disabled={!validCount || running}>
-                    {running ? <Spinner /> : <Play className="h-4 w-4" />}
-                    {running ? "Scoring…" : `Score ${validCount} candidate${validCount === 1 ? "" : "s"}`}
-                  </Button>
-                  {running && total > 0 && (
-                    <span className="text-sm text-muted-foreground">{job.data?.progress} done</span>
-                  )}
-                </div>
-
-                {running && (
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-accent transition-all"
-                      style={{ width: `${Math.max(pctDone, 4)}%` }}
-                    />
-                  </div>
-                )}
-                {submit.isError && <ErrorBanner error={submit.error} />}
-                {job.isError && <ErrorBanner error={job.error} />}
+                <CandidateRows rows={rows} setRows={setRows} max={maxBatch} />
+                <Button onClick={onSubmit} disabled={!validCount}>
+                  <Play className="h-4 w-4" />
+                  Score {validCount} candidate{validCount === 1 ? "" : "s"}
+                </Button>
               </CardContent>
             </Card>
           )}
 
-          {done && (
+          {running && (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 py-12">
+                <Spinner className="h-6 w-6 text-accent" />
+                <p className="text-sm font-medium">Running…</p>
+                <p className="text-xs text-muted-foreground">
+                  Scoring {validCount} candidate{validCount === 1 ? "" : "s"} on the server. A large
+                  batch can take several minutes — you can leave this tab open.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {succeeded && (
             <Card>
               <CardHeader>
                 <CardTitle>
@@ -108,6 +116,14 @@ export default function HrDashboard() {
               </CardHeader>
               <CardContent>
                 <CandidateTable results={results} onSelect={setSelected} />
+              </CardContent>
+            </Card>
+          )}
+
+          {failed && !succeeded && (
+            <Card>
+              <CardContent className="p-5">
+                <ErrorBanner error={new Error(errorMsg)} />
               </CardContent>
             </Card>
           )}

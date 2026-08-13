@@ -3,7 +3,6 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, GraduationCap, LineChart, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BackendStatus } from "@/components/BackendStatus";
 
 export default function LandingPage() {
   return (
@@ -13,7 +12,6 @@ export default function LandingPage() {
           <LineChart className="h-5 w-5 text-accent" /> RPP
         </div>
         <div className="flex items-center gap-4">
-          <BackendStatus />
           <Link href="/login">
             <Button variant="ghost" size="sm">
               Sign in

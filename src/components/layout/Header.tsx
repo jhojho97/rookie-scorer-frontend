@@ -5,7 +5,6 @@ import { LineChart, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/misc";
-import { BackendStatus } from "@/components/BackendStatus";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -25,9 +24,6 @@ export function Header() {
           <span className="sm:hidden">RPP</span>
         </Link>
         <div className="flex items-center gap-4">
-          <div className="hidden md:block">
-            <BackendStatus />
-          </div>
           {user && (
             <>
               <div className="flex items-center gap-2">

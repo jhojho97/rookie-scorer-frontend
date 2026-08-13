@@ -15,6 +15,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
 
+  // Silently warm the backend when the dashboard opens (no UI shown), so the
+  // first score doesn't pay the cold-start. Fire-and-forget.
+  useEffect(() => {
+    if (user) fetch("/api/health").catch(() => {});
+  }, [user]);
+
   if (loading || !user) {
     return (
       <div className="space-y-4 p-8">

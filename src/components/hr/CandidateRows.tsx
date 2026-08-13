@@ -52,11 +52,14 @@ export function CandidateRows({
   rows,
   setRows,
   disabled,
+  max,
 }: {
   rows: CandidateInput[];
   setRows: (r: CandidateInput[]) => void;
   disabled?: boolean;
+  max?: number;
 }) {
+  const atMax = max != null && rows.length >= max;
   const update = (id: string, patch: Partial<CandidateInput>) =>
     setRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
@@ -91,15 +94,22 @@ export function CandidateRows({
           </Button>
         </div>
       ))}
-      <Button
-        type="button"
-        variant="subtle"
-        size="sm"
-        disabled={disabled}
-        onClick={() => setRows([...rows, emptyRow()])}
-      >
-        <Plus className="h-4 w-4" /> Add candidate
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          variant="subtle"
+          size="sm"
+          disabled={disabled || atMax}
+          onClick={() => setRows([...rows, emptyRow()])}
+        >
+          <Plus className="h-4 w-4" /> Add candidate
+        </Button>
+        {max != null && (
+          <span className="text-xs text-muted-foreground">
+            {rows.length} / {max} {atMax && "(limit reached)"}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
