@@ -83,7 +83,10 @@ async function uploadDirect(token: string, path: string, form: FormData): Promis
     headers: authHeaders(token),
     cache: "no-store",
   });
-  if (!ticketRes.ok) throw new Error("ticket-unavailable");
+  if (!ticketRes.ok) {
+    const body = await ticketRes.text().catch(() => "");
+    throw new Error(`could not authorise the upload (${ticketRes.status}) ${body}`.trim());
+  }
   const { ticket, backend_url } = (await ticketRes.json()) as {
     ticket: string;
     backend_url: string;
@@ -104,13 +107,18 @@ async function postFiles(
 ): Promise<Response> {
   try {
     return await uploadDirect(token, path, form);
-  } catch {
+  } catch (e) {
+    // Surface WHY the direct upload failed. A bare "too large" message sends
+    // you hunting for a size problem when the real cause is usually reachability
+    // (a rejected CORS preflight shows up here as an opaque "Failed to fetch").
+    const cause = e instanceof Error ? e.message : String(e);
     // Only worth retrying through the proxy if the body could actually fit.
     if (approxBytes > PROXY_BODY_LIMIT) {
       throw new ApiError(
         413,
-        "Upload failed and the files are too large to send via the fallback route. " +
-          "Check that the backend is reachable, then try again.",
+        `Direct upload to the scoring service failed (${cause}), and these files ` +
+          `are too large (${(approxBytes / 1024 / 1024).toFixed(1)} MB) to send by the ` +
+          `fallback route, which is capped at ${PROXY_BODY_LIMIT / 1024 / 1024} MB.`,
       );
     }
     return fetch(proxyPath, { method: "POST", headers: authHeaders(token), body: form });
