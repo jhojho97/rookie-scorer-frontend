@@ -7,6 +7,13 @@ import "server-only";
 const BASE = process.env.BACKEND_API_URL ?? "https://rookie-scorer-api.onrender.com";
 const TOKEN = process.env.BACKEND_API_TOKEN ?? "";
 
+/** The backend origin. Safe to hand to the browser (it is a public URL); the
+ * API TOKEN is what must stay server-side. Needed so the client can upload
+ * files directly to the backend and skip Vercel's 4.5MB body limit. */
+export function backendBaseUrl() {
+  return BASE;
+}
+
 export interface BackendCall {
   path: string;
   method?: "GET" | "POST";
