@@ -168,14 +168,16 @@ export function ReportCard({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
+          {/* Same wording as the results table, so a recruiter clicking through
+              from "Outstanding areas" lands on a section by the same name. */}
           <FactorList
-            title="Top contributors"
+            title="Outstanding areas"
             icon={<TrendingUp className="h-4 w-4 text-positive" />}
             factors={positives}
             tone="positive"
           />
           <FactorList
-            title="Holding the score down"
+            title="Lagging areas"
             icon={<TrendingDown className="h-4 w-4 text-negative" />}
             factors={negatives}
             tone="negative"

@@ -5,9 +5,9 @@ import type { PredictionResult } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
-import { fmtPercentile, fmtUsd, toScore } from "@/lib/format";
+import { fmtPercentile } from "@/lib/format";
 
-type SortKey = "candidate" | "score" | "cost";
+type SortKey = "candidate" | "score";
 
 /**
  * The strongest factor in one direction.
@@ -22,7 +22,16 @@ function topFactor(r: PredictionResult, positive: boolean) {
   return fs[0]?.label ?? "—";
 }
 
-/** Sortable, searchable results table for the HR workflow. Row click → report. */
+/**
+ * Results table for the HR workflow. Row click → full report.
+ *
+ * Four columns only: who, how they rank, and what stands out either way. The
+ * raw score, per-candidate API cost and a status column were all removed —
+ * the raw score is uncalibrated and reads as a mark out of 100 next to the
+ * percentile that replaced it, and the other two are operational detail that
+ * has nothing to do with comparing candidates. A failed scoring is flagged on
+ * the row itself, which is the only case the status column ever carried.
+ */
 export function CandidateTable({
   results,
   onSelect,
@@ -38,9 +47,7 @@ export function CandidateTable({
     const filtered = results.filter((r) => name(r).includes(query.toLowerCase()));
     return filtered.sort((a, b) => {
       if (sort.key === "candidate") return name(a).localeCompare(name(b)) * sort.dir;
-      const num = (r: PredictionResult) =>
-        sort.key === "score" ? (r.prediction ?? -1) : (r.cost?.usd ?? 0);
-      return (num(a) - num(b)) * sort.dir;
+      return ((a.prediction ?? -1) - (b.prediction ?? -1)) * sort.dir;
     });
   }, [results, query, sort]);
 
@@ -63,6 +70,8 @@ export function CandidateTable({
     </th>
   );
 
+  const candidateName = (r: PredictionResult) => r.candidate ?? r.candidate_name ?? "—";
+
   return (
     <div className="space-y-3">
       <div className="relative max-w-xs">
@@ -74,7 +83,8 @@ export function CandidateTable({
           className="pl-9"
         />
       </div>
-      {/* Mobile: the 7-column table is unusable below ~720px, so present each
+
+      {/* Mobile: the table still doesn't fit below ~560px, so present each
           candidate as a card instead of forcing a horizontal scroll. */}
       <ul className="space-y-2 sm:hidden">
         {rows.map((r, i) => {
@@ -91,33 +101,23 @@ export function CandidateTable({
                 )}
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate font-medium">
-                    {r.candidate ?? r.candidate_name ?? "—"}
-                  </span>
-                  <span className="tnum text-lg font-semibold">
-                    {err
-                      ? "—"
-                      : typeof r.percentile === "number"
-                        ? fmtPercentile(r.percentile)
-                        : toScore(r.prediction)}
-                  </span>
+                  <span className="truncate font-medium">{candidateName(r)}</span>
+                  {err ? (
+                    <Badge tone="negative">not scored</Badge>
+                  ) : (
+                    <span className="tnum text-lg font-semibold">
+                      {typeof r.percentile === "number" ? fmtPercentile(r.percentile) : "—"}
+                    </span>
+                  )}
                 </div>
-                {err ? (
-                  <Badge tone="negative" className="mt-2">
-                    error
-                  </Badge>
-                ) : (
+                {!err && (
                   <dl className="mt-2 space-y-1 text-xs">
                     <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground">Raw score</dt>
-                      <dd className="tnum">{toScore(r.prediction)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground">Top +</dt>
+                      <dt className="text-muted-foreground">Outstanding</dt>
                       <dd className="truncate text-positive">{topFactor(r, true)}</dd>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <dt className="text-muted-foreground">Top −</dt>
+                      <dt className="text-muted-foreground">Lagging</dt>
                       <dd className="truncate text-negative">{topFactor(r, false)}</dd>
                     </div>
                   </dl>
@@ -134,18 +134,15 @@ export function CandidateTable({
       </ul>
 
       <div className="hidden overflow-x-auto rounded-lg border border-border sm:block">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
               <Th k="candidate" label="Candidate" />
               {/* Sorting still keys off the raw prediction; percentile is a
                   monotonic transform of it, so the order is identical. */}
               <Th k="score" label="Percentile" />
-              <th className="px-3 py-2 text-left font-medium">Raw score</th>
-              <th className="px-3 py-2 text-left font-medium">Top +</th>
-              <th className="px-3 py-2 text-left font-medium">Top −</th>
-              <Th k="cost" label="Cost" />
-              <th className="px-3 py-2 text-left font-medium">Status</th>
+              <th className="px-3 py-2 text-left font-medium">Outstanding areas</th>
+              <th className="px-3 py-2 text-left font-medium">Lagging areas</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -160,25 +157,29 @@ export function CandidateTable({
                     err ? "opacity-60" : "cursor-pointer hover:bg-muted/40",
                   )}
                 >
-                  <td className="px-3 py-2 font-medium">{r.candidate ?? r.candidate_name ?? "—"}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate">{candidateName(r)}</span>
+                      {/* Without a status column this is the only signal that a
+                          candidate failed rather than simply scoring poorly. */}
+                      {err && (
+                        <Badge tone="negative" title={r.reason ?? undefined}>
+                          not scored
+                        </Badge>
+                      )}
+                    </span>
+                  </td>
                   <td className="tnum px-3 py-2 font-medium">
                     {err ? "—" : typeof r.percentile === "number" ? fmtPercentile(r.percentile) : "—"}
                   </td>
-                  <td className="tnum px-3 py-2 text-muted-foreground">
-                    {err ? "—" : toScore(r.prediction)}
-                  </td>
                   <td className="px-3 py-2 text-positive">{err ? "—" : topFactor(r, true)}</td>
                   <td className="px-3 py-2 text-negative">{err ? "—" : topFactor(r, false)}</td>
-                  <td className="tnum px-3 py-2">{fmtUsd(r.cost?.usd ?? 0)}</td>
-                  <td className="px-3 py-2">
-                    {err ? <Badge tone="negative">error</Badge> : <Badge tone="positive">done</Badge>}
-                  </td>
                 </tr>
               );
             })}
             {!rows.length && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
                   No candidates match your search.
                 </td>
               </tr>
