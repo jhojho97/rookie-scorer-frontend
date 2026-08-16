@@ -1,8 +1,16 @@
 import "server-only";
 import { verifyRequest, getAdminInitError, getLastVerifyError, getAdminProjectId } from "@/lib/firebaseAdmin";
+import type { VerifiedUser } from "@/lib/firebaseAdmin";
 
-/** Shared auth gate for the scoring proxy routes. Returns null if allowed. */
-export async function guard(req: Request): Promise<Response | null> {
+/**
+ * Shared auth gate for the scoring proxy routes.
+ *
+ * Returns the verified user on success, or a Response to return immediately.
+ * Callers MUST forward the user's uid to the backend (see `userHeader`) — the
+ * backend meters spend per user and cannot identify anyone on its own, because
+ * only this proxy ever sees a Firebase token.
+ */
+export async function guard(req: Request): Promise<{ user: VerifiedUser } | Response> {
   const user = await verifyRequest(req.headers.get("authorization"));
   if (!user) {
     const initErr = getAdminInitError();
@@ -19,5 +27,10 @@ export async function guard(req: Request): Promise<Response | null> {
       { status: 401 },
     );
   }
-  return null;
+  return { user };
+}
+
+/** Identifies the caller to the backend for per-user metering. */
+export function userHeader(user: VerifiedUser): Record<string, string> {
+  return { "X-User-Id": user.uid };
 }

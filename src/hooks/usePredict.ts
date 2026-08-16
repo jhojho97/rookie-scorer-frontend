@@ -8,7 +8,7 @@ import type { PredictionResult } from "@/types";
 /** Single-candidate prediction. Records the returned cost into the usage ledger. */
 export function usePredict() {
   const { getIdToken } = useAuth();
-  const { add } = useUsage();
+  const { add, refreshServer } = useUsage();
 
   return useMutation<PredictionResult, Error, { cv: File; jmp: File | null }>({
     mutationFn: async ({ cv, jmp }) => {
@@ -22,6 +22,7 @@ export function usePredict() {
         kind: "single",
         label: res.candidate_name ?? undefined,
       });
+      void refreshServer();
     },
   });
 }

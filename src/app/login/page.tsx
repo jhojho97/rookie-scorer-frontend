@@ -7,6 +7,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/misc";
+import { PasswordField } from "@/components/auth/PasswordField";
 import { authErrorMessage } from "@/lib/authError";
 
 export default function LoginPage() {
@@ -50,23 +51,25 @@ export default function LoginPage() {
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+          rightSlot={
             <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-accent">
               Forgot?
             </Link>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+          }
+        />
         {error && <p className="text-sm text-negative">{error}</p>}
         <Button type="submit" className="w-full" disabled={busy}>
           {busy && <Spinner />} Sign in

@@ -9,7 +9,8 @@ function esc(v: unknown): string {
 export function resultsToCsv(rows: PredictionResult[]): string {
   const header = [
     "candidate",
-    "score",
+    "percentile",
+    "raw_score",
     "baseline",
     "top_positive",
     "top_negative",
@@ -18,11 +19,15 @@ export function resultsToCsv(rows: PredictionResult[]): string {
     "status",
   ];
   const lines = rows.map((r) => {
+    // Factors are sorted by |contribution| descending, so the FIRST match in
+    // each direction is the strongest. Reversing to find the negative returned
+    // the weakest detractor instead — the same bug the results table had.
     const factors = r.top_factors ?? [];
     const pos = factors.find((f) => f.contribution >= 0)?.label ?? "";
-    const neg = [...factors].reverse().find((f) => f.contribution < 0)?.label ?? "";
+    const neg = factors.find((f) => f.contribution < 0)?.label ?? "";
     return [
       r.candidate ?? r.candidate_name ?? "",
+      r.status === "error" || typeof r.percentile !== "number" ? "" : r.percentile.toFixed(1),
       r.status === "error" ? "" : r.prediction?.toFixed(4),
       r.baseline?.toFixed(4) ?? "",
       pos,

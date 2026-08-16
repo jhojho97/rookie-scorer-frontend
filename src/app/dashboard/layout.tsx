@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { Skeleton } from "@/components/ui/misc";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -29,13 +28,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
+  // No sidebar: each role has exactly ONE destination, so a nav rail was 224px
+  // of chrome pointing at the page you were already on. Role switching lives in
+  // the header instead.
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
-      </div>
+      <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
     </div>
   );
 }

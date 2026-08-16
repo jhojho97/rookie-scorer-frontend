@@ -8,9 +8,9 @@ import { UploadCard } from "@/components/UploadCard";
 import { ReportCard } from "@/components/ReportCard";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { ErrorBanner } from "@/components/ErrorBanner";
+import { JobProgress } from "@/components/JobProgress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/misc";
 
 /**
  * Single-candidate scoring runs through the backend's async JOB flow (submit ->
@@ -20,11 +20,10 @@ import { Spinner } from "@/components/ui/misc";
  */
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { submit, job, reset } = useBatchJob();
+  const { submit, job, reset, progress, running, coldStart, etaSeconds } = useBatchJob();
   const [cv, setCv] = useState<File | null>(null);
   const [jmp, setJmp] = useState<File | null>(null);
 
-  const running = submit.isPending || job.data?.status === "running";
   const done = job.data?.status === "done";
   const result = job.data?.results?.[0];
   const failed = submit.isError || job.data?.status === "error" || result?.status === "error";
@@ -37,7 +36,7 @@ export default function StudentDashboard() {
 
   function onScore() {
     if (!cv) return;
-    submit.mutate([{ id: "me", name: "Your profile", cv, jmp }]);
+    submit.mutate({ kind: "rows", rows: [{ id: "me", name: "Your profile", cv, jmp }] });
   }
 
   return (
@@ -71,11 +70,13 @@ export default function StudentDashboard() {
           {running && (
             <Card>
               <CardContent className="flex flex-col items-center gap-3 py-12">
-                <Spinner className="h-6 w-6 text-accent" />
-                <p className="text-sm font-medium">Running…</p>
-                <p className="text-xs text-muted-foreground">
-                  Scoring on the server — this can take up to a minute or two. You can leave this tab open.
-                </p>
+                <JobProgress
+                  done={progress.done}
+                  total={progress.total}
+                  coldStart={coldStart}
+                  etaSeconds={etaSeconds}
+                  unit="profile"
+                />
               </CardContent>
             </Card>
           )}

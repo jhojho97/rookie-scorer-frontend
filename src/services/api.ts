@@ -9,6 +9,7 @@ import type {
   BatchSubmitResponse,
   JobStatusResponse,
   CandidateInput,
+  ServerUsage,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -175,6 +176,34 @@ export async function batchPredict(
     fileBytes(...candidates.flatMap((c) => [c.cv, c.jmp])),
   );
   return parse<BatchSubmitResponse>(res);
+}
+
+/**
+ * Batch from a ZIP of candidate folders — the workflow HR actually has, rather
+ * than picking 40 files through 40 dialogs. The backend identifies each folder's
+ * CV and JMP by filename heuristics.
+ */
+export async function batchPredictZip(
+  token: string,
+  archive: File,
+  topN = 5,
+): Promise<BatchSubmitResponse> {
+  const form = new FormData();
+  form.append("archive", archive, archive.name);
+  const res = await postFiles(
+    token,
+    `/predict/batch?top_n=${topN}`,
+    `/api/batch?top_n=${topN}`,
+    form,
+    archive.size,
+  );
+  return parse<BatchSubmitResponse>(res);
+}
+
+/** Server-side metered spend — the only figure that gates anything. */
+export async function serverUsage(token: string): Promise<ServerUsage> {
+  const res = await fetch("/api/usage", { headers: authHeaders(token), cache: "no-store" });
+  return parse<ServerUsage>(res);
 }
 
 export async function pollJob(token: string, jobId: string): Promise<JobStatusResponse> {

@@ -28,19 +28,56 @@ interface AuthCtx {
   register: (email: string, password: string, role: Role) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  setRole: (role: Role) => void;
+  /** Switch role; persisted to the account as a custom claim. */
+  setRole: (role: Role) => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
 
-// Role isn't a backend concept — persist it client-side, keyed by uid.
+/**
+ * Role lives in a Firebase CUSTOM CLAIM, so it belongs to the ACCOUNT and
+ * follows the user to any device. localStorage is kept only as (a) an offline
+ * cache for instant first paint and (b) a fallback when Firebase Admin is not
+ * configured (dev). It is never the source of truth when a claim exists —
+ * previously it was, which silently demoted HR users to Student on any second
+ * device and left no way to change role at all.
+ */
 const roleKey = (uid: string) => `role:${uid}`;
-function loadRole(uid: string): Role {
+const isRole = (v: unknown): v is Role => v === "student" || v === "hr";
+
+function cachedRole(uid: string): Role {
   if (typeof window === "undefined") return "student";
-  return (localStorage.getItem(roleKey(uid)) as Role) || "student";
+  const v = localStorage.getItem(roleKey(uid));
+  return isRole(v) ? v : "student";
 }
-function saveRole(uid: string, role: Role) {
-  localStorage.setItem(roleKey(uid), role);
+function cacheRole(uid: string, role: Role) {
+  if (typeof window !== "undefined") localStorage.setItem(roleKey(uid), role);
+}
+
+/** Read the role claim off the ID token, falling back to the local cache. */
+async function resolveRole(u: FbUser): Promise<Role> {
+  try {
+    const { claims } = await u.getIdTokenResult();
+    if (isRole(claims.role)) {
+      cacheRole(u.uid, claims.role);
+      return claims.role;
+    }
+  } catch {
+    /* offline or token unavailable — fall through to the cache */
+  }
+  return cachedRole(u.uid);
+}
+
+/** Persist a role as a custom claim, then refresh the token so it takes effect. */
+async function persistRole(u: FbUser, role: Role): Promise<void> {
+  cacheRole(u.uid, role);
+  const res = await fetch("/api/role", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await u.getIdToken()}` },
+    body: JSON.stringify({ role }),
+  });
+  // A new claim is only visible after the ID token is re-minted.
+  if (res.ok) await u.getIdToken(true);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -61,8 +98,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!auth) return;
     return onAuthStateChanged(auth, (u) => {
       setFbUser(u);
-      setUser(u ? { uid: u.uid, email: u.email ?? "", role: loadRole(u.uid) } : null);
+      if (!u) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      // Paint immediately from the cache, then correct from the token claim.
+      setUser({ uid: u.uid, email: u.email ?? "", role: cachedRole(u.uid) });
       setLoading(false);
+      resolveRole(u).then((role) =>
+        setUser((prev) => (prev && prev.uid === u.uid ? { ...prev, role } : prev)),
+      );
     });
   }, [devMode]);
 
@@ -74,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function login(email: string, password: string) {
       if (devMode) {
-        const u: AppUser = { uid: `dev:${email}`, email, role: loadRole(`dev:${email}`) };
+        const u: AppUser = { uid: `dev:${email}`, email, role: cachedRole(`dev:${email}`) };
         localStorage.setItem("dev-user", JSON.stringify(u));
         setUser(u);
         return;
@@ -86,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function register(email: string, password: string, role: Role) {
       if (devMode) {
         const uid = `dev:${email}`;
-        saveRole(uid, role);
+        cacheRole(uid, role);
         const u: AppUser = { uid, email, role };
         localStorage.setItem("dev-user", JSON.stringify(u));
         setUser(u);
@@ -94,7 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const auth = getFirebaseAuth()!;
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      saveRole(cred.user.uid, role);
+      // Attach the role to the account itself, not just this browser. If the
+      // claim write fails we still proceed — the cached role keeps them moving
+      // and the next role change will retry.
+      await persistRole(cred.user, role).catch(() => {});
       setUser({ uid: cred.user.uid, email, role });
     }
 
@@ -112,11 +161,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signOut(getFirebaseAuth()!);
     }
 
-    function setRole(role: Role) {
+    async function setRole(role: Role) {
       if (!user) return;
-      saveRole(user.uid, role);
+      cacheRole(user.uid, role);
       setUser({ ...user, role });
-      if (devMode) localStorage.setItem("dev-user", JSON.stringify({ ...user, role }));
+      if (devMode) {
+        localStorage.setItem("dev-user", JSON.stringify({ ...user, role }));
+        return;
+      }
+      if (fbUser) await persistRole(fbUser, role);
     }
 
     return { user, loading, devMode, getIdToken, login, register, resetPassword, logout, setRole };

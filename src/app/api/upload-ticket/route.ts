@@ -1,4 +1,4 @@
-import { guard } from "../_guard";
+import { guard, userHeader } from "../_guard";
 import { backendBaseUrl, callBackend } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +15,22 @@ export const maxDuration = 60;
  *
  * Security is unchanged: the caller is still authenticated with their Firebase
  * ID token here, the secret X-API-Key never leaves the server, and the ticket
- * the browser receives is short-lived and burns on first use.
+ * the browser receives is short-lived and burns on first use. The ticket is
+ * bound server-side to this uid, so spend from the upload is billed to them
+ * even though the browser never sends an identity of its own.
  */
 export async function POST(req: Request) {
-  const blocked = await guard(req);
-  if (blocked) return blocked;
+  const g = await guard(req);
+  if (g instanceof Response) return g;
 
   // This tiny call is also what wakes a sleeping Render instance, so allow for a
   // cold start but return before Vercel's own 60s function ceiling.
-  const res = await callBackend({ path: "/upload-ticket", method: "POST", timeoutMs: 55_000 });
+  const res = await callBackend({
+    path: "/upload-ticket",
+    method: "POST",
+    timeoutMs: 55_000,
+    headers: userHeader(g.user),
+  });
   if (!res.ok) return res;
 
   const ticket = (await res.json()) as { ticket: string; expires_in: number };

@@ -20,9 +20,17 @@ export interface BackendCall {
   body?: BodyInit;
   // Render free tier cold-starts (~50s); allow a generous timeout.
   timeoutMs?: number;
+  /** Extra headers, e.g. X-User-Id for per-user spend metering. */
+  headers?: Record<string, string>;
 }
 
-export async function callBackend({ path, method = "GET", body, timeoutMs = 130_000 }: BackendCall) {
+export async function callBackend({
+  path,
+  method = "GET",
+  body,
+  timeoutMs = 130_000,
+  headers = {},
+}: BackendCall) {
   if (!TOKEN) {
     return Response.json({ error: "Server missing BACKEND_API_TOKEN." }, { status: 500 });
   }
@@ -31,7 +39,7 @@ export async function callBackend({ path, method = "GET", body, timeoutMs = 130_
   try {
     const res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { "X-API-Key": TOKEN },
+      headers: { "X-API-Key": TOKEN, ...headers },
       body,
       signal: controller.signal,
       cache: "no-store",

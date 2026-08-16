@@ -8,6 +8,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/misc";
+import { MIN_PASSWORD, PasswordField } from "@/components/auth/PasswordField";
 import { authErrorMessage } from "@/lib/authError";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/types";
@@ -19,6 +20,7 @@ function RegisterForm() {
   const [role, setRole] = useState<Role>((params.get("role") as Role) === "hr" ? "hr" : "student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -26,8 +28,13 @@ function RegisterForm() {
     if (user) router.replace(user.role === "hr" ? "/dashboard/hr" : "/dashboard/student");
   }, [user, router]);
 
+  const tooShort = password.length > 0 && password.length < MIN_PASSWORD;
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const canSubmit = password.length >= MIN_PASSWORD && confirm === password && !busy;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canSubmit) return;
     setBusy(true);
     setError(null);
     try {
@@ -39,9 +46,19 @@ function RegisterForm() {
     }
   }
 
-  const roles: { value: Role; label: string; icon: React.ReactNode }[] = [
-    { value: "student", label: "Student", icon: <GraduationCap className="h-4 w-4" /> },
-    { value: "hr", label: "HR / Headhunter", icon: <Users className="h-4 w-4" /> },
+  const roles: { value: Role; label: string; icon: React.ReactNode; blurb: string }[] = [
+    {
+      value: "student",
+      label: "Student",
+      icon: <GraduationCap className="h-4 w-4" />,
+      blurb: "Score your own profile",
+    },
+    {
+      value: "hr",
+      label: "HR / Headhunter",
+      icon: <Users className="h-4 w-4" />,
+      blurb: "Score and rank many candidates",
+    },
   ];
 
   return (
@@ -58,41 +75,59 @@ function RegisterForm() {
       }
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-2">
+        <div role="radiogroup" aria-label="How will you use this?" className="grid grid-cols-2 gap-2">
           {roles.map((r) => (
             <button
               type="button"
               key={r.value}
+              role="radio"
+              aria-checked={role === r.value}
               onClick={() => setRole(r.value)}
               className={cn(
-                "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-sm transition-colors",
+                "flex flex-col items-center gap-1 rounded-lg border p-3 text-center text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 role === r.value
                   ? "border-accent bg-accent/10 text-accent"
                   : "border-border text-muted-foreground hover:bg-muted",
               )}
             >
               {r.icon}
-              {r.label}
+              <span className="font-medium">{r.label}</span>
+              <span className="text-[11px] leading-tight opacity-80">{r.blurb}</span>
             </button>
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">You can switch this later from the menu.</p>
+
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
           <Input
-            id="password"
-            type="password"
+            id="email"
+            type="email"
             required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
+
+        <PasswordField
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          showStrength
+          minLength={MIN_PASSWORD}
+          error={tooShort ? `Use at least ${MIN_PASSWORD} characters.` : null}
+        />
+        <PasswordField
+          label="Confirm password"
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+          error={mismatch ? "Passwords don't match." : null}
+        />
+
         {error && <p className="text-sm text-negative">{error}</p>}
-        <Button type="submit" className="w-full" disabled={busy}>
+        <Button type="submit" className="w-full" disabled={!canSubmit}>
           {busy && <Spinner />} Create account
         </Button>
       </form>

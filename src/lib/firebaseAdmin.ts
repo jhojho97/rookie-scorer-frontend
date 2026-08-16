@@ -73,7 +73,7 @@ function resolveCreds(): Creds | null {
   return { projectId, clientEmail, privateKey };
 }
 
-function getAdminApp(): App | null {
+export function getAdminApp(): App | null {
   const creds = resolveCreds();
   if (!creds) return null;
   if (app) return app;

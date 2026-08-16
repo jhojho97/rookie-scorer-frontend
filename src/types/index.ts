@@ -10,15 +10,33 @@ export interface HealthResponse {
   target: string;
   model_ready: boolean;
   fetch_2degree?: boolean;
+  max_batch?: number;
+  batch_workers?: number;
+  user_monthly_usd?: number;
+  user_hourly_scores?: number;
 }
 
 /** One SHAP contribution factor. `value` is null for the paper-text factor. */
 export interface TopFactor {
+  /** Raw model column name, e.g. "number of awards". Stable; use for logic. */
+  feature?: string;
   label: string;
   value: number | string | null;
   contribution: number; // signed; sums toward (prediction - baseline)
   direction: "increases" | "decreases";
   set: "C" | "D" | "E";
+}
+
+/** Server-side metered spend. This is the number that actually gates work. */
+export interface ServerUsage {
+  uid: string;
+  month_usd: number;
+  cap_usd: number;
+  remaining_usd: number;
+  scores_last_hour: number;
+  hourly_limit: number;
+  enforced: boolean;
+  resets_on_restart: boolean;
 }
 
 export interface Extraction {
@@ -52,6 +70,22 @@ export interface PredictionResult {
   baseline: number; // 0..1
   sets_used: string[];
   sets_skipped: string[];
+  /**
+   * Each feature set's own probability before ensembling. Their spread shows
+   * how much the model's components disagree — useful as a caveat, but NOT a
+   * calibrated confidence interval and must never be presented as one.
+   */
+  set_predictions?: Partial<Record<"C" | "D" | "E", number>>;
+  /**
+   * Rank of this score within the held-out reference cohort, 0-100. This is
+   * the figure to lead with: `prediction` is uncalibrated, so its magnitude
+   * misleads, while its ORDERING is what the model is good at.
+   */
+  percentile?: number | null;
+  /** Size of that reference cohort. */
+  cohort_n?: number;
+  /** ISO-8601 UTC instant the scoring ran, from the server. */
+  scored_at?: string;
   candidate_name: string | null;
   top_factors: TopFactor[];
   extraction: Extraction;

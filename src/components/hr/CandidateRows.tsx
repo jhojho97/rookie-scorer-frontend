@@ -15,10 +15,12 @@ function FileSlot({
   label,
   file,
   onChange,
+  onReject,
 }: {
   label: string;
   file: File | null;
   onChange: (f: File | null) => void;
+  onReject: (msg: string) => void;
 }) {
   const maxBytes = publicEnv.maxFileMb * 1024 * 1024;
   return (
@@ -37,8 +39,11 @@ function FileSlot({
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0] ?? null;
+          // A blocking native alert() is jarring and inconsistent with every
+          // other error in the app; report it inline like the rest.
           if (f && f.size > maxBytes) {
-            alert(`File exceeds ${publicEnv.maxFileMb} MB.`);
+            onReject(`"${f.name}" is ${(f.size / 1024 / 1024).toFixed(1)} MB — the limit is ${publicEnv.maxFileMb} MB.`);
+            e.target.value = "";
             return;
           }
           onChange(f);
@@ -53,11 +58,13 @@ export function CandidateRows({
   setRows,
   disabled,
   max,
+  onReject,
 }: {
   rows: CandidateInput[];
   setRows: (r: CandidateInput[]) => void;
   disabled?: boolean;
   max?: number;
+  onReject: (msg: string) => void;
 }) {
   const atMax = max != null && rows.length >= max;
   const update = (id: string, patch: Partial<CandidateInput>) =>
@@ -80,8 +87,18 @@ export function CandidateRows({
             onChange={(e) => update(r.id, { name: e.target.value })}
             className="h-9"
           />
-          <FileSlot label="Upload CV" file={r.cv} onChange={(f) => update(r.id, { cv: f })} />
-          <FileSlot label="Upload JMP" file={r.jmp} onChange={(f) => update(r.id, { jmp: f })} />
+          <FileSlot
+            label="Upload CV"
+            file={r.cv}
+            onChange={(f) => update(r.id, { cv: f })}
+            onReject={onReject}
+          />
+          <FileSlot
+            label="Upload JMP"
+            file={r.jmp}
+            onChange={(f) => update(r.id, { jmp: f })}
+            onReject={onReject}
+          />
           <Button
             type="button"
             variant="ghost"
