@@ -259,7 +259,7 @@ export default function HrDashboard() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ReportCard result={selected} showAdvice={false} />
+            <ReportCard result={selected} variant="reviewer" />
           </div>
         </div>
       )}

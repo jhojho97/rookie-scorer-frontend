@@ -50,19 +50,31 @@ function FactorList({
 }
 
 /**
- * `showAdvice` is on for the student's own report and off for the HR drill-in:
- * "here is how to raise your score" is guidance for the person being scored,
- * not for someone deciding about them.
+ * Two audiences, two reports.
+ *
+ * "student" — the person being scored. Their rank, what drove it, and what they
+ * could do about it. The model's internals (raw uncalibrated score, baseline,
+ * per-component disagreement), the parsed-feature dump and the API cost are all
+ * noise to them: they cannot act on any of it and the raw number actively
+ * misleads, since it reads as a mark out of 100.
+ *
+ * "reviewer" — the HR drill-in. Gets the internals, because they are deciding
+ * about someone else and should see how firm the number is, plus the cost,
+ * because they are the one spending it. Does NOT get the improvement advice:
+ * that is guidance for the candidate, not for whoever is judging them.
  */
+export type ReportVariant = "student" | "reviewer";
+
 export function ReportCard({
   result,
-  showAdvice = true,
+  variant = "reviewer",
 }: {
   result: PredictionResult;
-  showAdvice?: boolean;
+  variant?: ReportVariant;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const isStudent = variant === "student";
 
   const name = result.candidate_name || result.candidate || "Candidate";
   const factors = result.top_factors ?? [];
@@ -122,22 +134,26 @@ export function ReportCard({
                 percentile={result.percentile}
                 cohortN={result.cohort_n}
               />
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
-                <Badge tone={delta >= 0 ? "positive" : "negative"}>
-                  {delta >= 0 ? "+" : ""}
-                  {delta} vs baseline
-                </Badge>
-                <span className="text-muted-foreground">
-                  raw score {toScore(result.prediction)} · baseline {toScore(result.baseline)}
-                </span>
-              </div>
-              <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
-                The raw score ranks candidates but is not a calibrated probability — read the
-                percentile, not the number out of 100.
-              </p>
-              <div className="mt-4">
-                <ComponentSpread result={result} />
-              </div>
+              {!isStudent && (
+                <>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+                    <Badge tone={delta >= 0 ? "positive" : "negative"}>
+                      {delta >= 0 ? "+" : ""}
+                      {delta} vs baseline
+                    </Badge>
+                    <span className="text-muted-foreground">
+                      raw score {toScore(result.prediction)} · baseline {toScore(result.baseline)}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
+                    The raw score ranks candidates but is not a calibrated probability — read the
+                    percentile, not the number out of 100.
+                  </p>
+                  <div className="mt-4">
+                    <ComponentSpread result={result} />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -166,10 +182,14 @@ export function ReportCard({
           />
         </div>
 
-        {showAdvice && <ActionableFactors factors={factors} />}
+        {isStudent && <ActionableFactors factors={factors} />}
 
-        <FeatureAccordion extraction={result.extraction ?? {}} />
-        <CostCard cost={result.cost} />
+        {!isStudent && (
+          <>
+            <FeatureAccordion extraction={result.extraction ?? {}} />
+            <CostCard cost={result.cost} />
+          </>
+        )}
       </div>
     </div>
   );

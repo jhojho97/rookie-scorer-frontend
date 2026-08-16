@@ -88,7 +88,7 @@ export default function StudentDashboard() {
                   Score another
                 </Button>
               </div>
-              <ReportCard result={result} />
+              <ReportCard result={result} variant="student" />
             </motion.div>
           )}
 
