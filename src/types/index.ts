@@ -84,6 +84,14 @@ export interface PredictionResult {
   percentile?: number | null;
   /** Size of that reference cohort. */
   cohort_n?: number;
+  /**
+   * False when the CV could not be read. The score is still returned, but it
+   * was computed from an all-defaults feature row and means nothing — always
+   * surface this rather than presenting the number on its own.
+   */
+  extraction_ok?: boolean;
+  /** Human-readable reasons the extraction degraded. */
+  extraction_problems?: string[];
   /** ISO-8601 UTC instant the scoring ran, from the server. */
   scored_at?: string;
   candidate_name: string | null;

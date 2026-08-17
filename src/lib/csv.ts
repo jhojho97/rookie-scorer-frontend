@@ -17,6 +17,9 @@ export function resultsToCsv(rows: PredictionResult[]): string {
     "cost_usd",
     "tokens",
     "status",
+    // Without this, a row scored from an unreadable CV is indistinguishable
+    // from a genuinely low-ranking one once the data leaves the app.
+    "cv_readable",
   ];
   const lines = rows.map((r) => {
     // Factors are sorted by |contribution| descending, so the FIRST match in
@@ -35,6 +38,7 @@ export function resultsToCsv(rows: PredictionResult[]): string {
       r.cost?.usd?.toFixed(6) ?? "",
       r.cost?.total_tokens ?? "",
       r.status === "error" ? `error: ${r.reason ?? ""}` : "ok",
+      r.extraction_ok === false ? "no" : "yes",
     ]
       .map(esc)
       .join(",");

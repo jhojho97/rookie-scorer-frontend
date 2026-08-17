@@ -8,6 +8,7 @@ import { Badge, Spinner } from "@/components/ui/misc";
 import { ScoreGauge } from "./ScoreGauge";
 import { ActionableFactors } from "./ActionableFactors";
 import { ComponentSpread } from "./ComponentSpread";
+import { ExtractionWarning } from "./ExtractionWarning";
 import { ContributionChart } from "./ContributionChart";
 import { CostCard } from "./CostCard";
 import { FeatureAccordion } from "./FeatureAccordion";
@@ -120,8 +121,10 @@ export function ReportCard({
         </Button>
       </div>
 
-      {/* Everything inside this ref is captured into the PDF. */}
+      {/* Everything inside this ref is captured into the PDF — including the
+          warning, so an unreliable score stays labelled once exported. */}
       <div ref={ref} className="space-y-4 rounded-lg">
+        <ExtractionWarning result={result} />
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>

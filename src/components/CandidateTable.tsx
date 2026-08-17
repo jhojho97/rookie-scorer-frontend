@@ -104,6 +104,8 @@ export function CandidateTable({
                   <span className="truncate font-medium">{candidateName(r)}</span>
                   {err ? (
                     <Badge tone="negative">not scored</Badge>
+                  ) : r.extraction_ok === false ? (
+                    <Badge tone="warning">CV unreadable</Badge>
                   ) : (
                     <span className="tnum text-lg font-semibold">
                       {typeof r.percentile === "number" ? fmtPercentile(r.percentile) : "—"}
@@ -160,11 +162,20 @@ export function CandidateTable({
                   <td className="px-3 py-2 font-medium">
                     <span className="flex items-center gap-2">
                       <span className="truncate">{candidateName(r)}</span>
-                      {/* Without a status column this is the only signal that a
-                          candidate failed rather than simply scoring poorly. */}
+                      {/* Without a status column these are the only signals that
+                          a row failed, or was scored on an unreadable CV, rather
+                          than simply ranking low. */}
                       {err && (
                         <Badge tone="negative" title={r.reason ?? undefined}>
                           not scored
+                        </Badge>
+                      )}
+                      {!err && r.extraction_ok === false && (
+                        <Badge
+                          tone="warning"
+                          title={(r.extraction_problems ?? []).join(" ") || undefined}
+                        >
+                          CV unreadable
                         </Badge>
                       )}
                     </span>
