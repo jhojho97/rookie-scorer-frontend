@@ -6,16 +6,22 @@ import { getAdminApp } from "@/lib/firebaseAdmin";
 export const dynamic = "force-dynamic";
 
 /**
- * Persists the caller's role as a Firebase CUSTOM CLAIM.
+ * Persists the caller's role as a Firebase CUSTOM CLAIM, ONCE.
  *
  * Role used to live in localStorage keyed by uid, which meant it was a property
  * of the browser rather than the account: signing in on a second device
- * silently demoted every HR user to Student, and there was no way to change it.
- * A custom claim travels with the account and is readable from the ID token.
+ * silently demoted every HR user to Student. A custom claim travels with the
+ * account and is readable from the ID token.
  *
- * Roles here are self-declared (they choose at registration and may switch),
- * so this grants no privilege the user could not already claim — it decides
- * which dashboard they see, not what the backend will do for them.
+ * Write-once: the role is chosen at registration and fixed thereafter. Removing
+ * the switch from the UI would not have been enough on its own — this endpoint
+ * is reachable by any authenticated caller, so without the check here a user
+ * could still flip their own role with a single request. A student and a
+ * recruiter are not two views of one person; they see different information
+ * about different people.
+ *
+ * To correct a genuine mistake, change the claim out of band (Firebase console
+ * or the Admin SDK). That is deliberate friction, not an oversight.
  */
 export async function POST(req: Request) {
   const g = await guard(req);
@@ -32,7 +38,21 @@ export async function POST(req: Request) {
     return Response.json({ role, persisted: false });
   }
   try {
-    await getAuth(app).setCustomUserClaims(g.user.uid, { role });
+    const auth = getAuth(app);
+    const existing = (await auth.getUser(g.user.uid)).customClaims?.role;
+    if (existing === "student" || existing === "hr") {
+      if (existing !== role) {
+        return Response.json(
+          {
+            error: "Your account type is fixed and cannot be changed.",
+            role: existing,
+          },
+          { status: 409 },
+        );
+      }
+      return Response.json({ role: existing, persisted: true, unchanged: true });
+    }
+    await auth.setCustomUserClaims(g.user.uid, { role });
     return Response.json({ role, persisted: true });
   } catch (e) {
     return Response.json(

@@ -28,8 +28,6 @@ interface AuthCtx {
   register: (email: string, password: string, role: Role) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  /** Switch role; persisted to the account as a custom claim. */
-  setRole: (role: Role) => Promise<void>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -161,18 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signOut(getFirebaseAuth()!);
     }
 
-    async function setRole(role: Role) {
-      if (!user) return;
-      cacheRole(user.uid, role);
-      setUser({ ...user, role });
-      if (devMode) {
-        localStorage.setItem("dev-user", JSON.stringify({ ...user, role }));
-        return;
-      }
-      if (fbUser) await persistRole(fbUser, role);
-    }
-
-    return { user, loading, devMode, getIdToken, login, register, resetPassword, logout, setRole };
+    return { user, loading, devMode, getIdToken, login, register, resetPassword, logout };
   }, [user, loading, devMode, fbUser]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

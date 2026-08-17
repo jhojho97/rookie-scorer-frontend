@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Skeleton } from "@/components/ui/misc";
@@ -8,10 +8,19 @@ import { Skeleton } from "@/components/ui/misc";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const home = user?.role === "hr" ? "/dashboard/hr" : "/dashboard/student";
+  // Each role has exactly one dashboard. Without this, typing the other role's
+  // URL walked straight into it — hiding the navigation is not the same as
+  // preventing the visit.
+  const wrongDashboard = Boolean(user) && pathname !== home && pathname.startsWith("/dashboard");
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (loading) return;
+    if (!user) router.replace("/login");
+    else if (wrongDashboard) router.replace(home);
+  }, [loading, user, wrongDashboard, home, router]);
 
   // Silently warm the backend when the dashboard opens (no UI shown), so the
   // first score doesn't pay the cold-start. Fire-and-forget.
@@ -19,7 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user) fetch("/api/health").catch(() => {});
   }, [user]);
 
-  if (loading || !user) {
+  if (loading || !user || wrongDashboard) {
     return (
       <div className="space-y-4 p-8">
         <Skeleton className="h-8 w-48" />
