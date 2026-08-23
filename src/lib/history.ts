@@ -18,12 +18,35 @@ export interface BatchRecord {
 
 const KEY = "batch-history";
 const MAX_BATCHES = 10;
+/**
+ * Saved batches expire after a month.
+ *
+ * These records name real candidates and carry their parsed CV attributes.
+ * Keeping them on a recruiter's laptop indefinitely is retention nobody agreed
+ * to, so the store forgets on its own rather than relying on anyone to clear
+ * it. Expiry is enforced on READ, so a stale record is dropped even if the app
+ * has not been opened since it lapsed.
+ */
+export const RETENTION_DAYS = 30;
+const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 export function loadBatches(): BatchRecord[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) ?? "[]") as BatchRecord[];
-    return Array.isArray(raw) ? raw : [];
+    if (!Array.isArray(raw)) return [];
+    const cutoff = Date.now() - RETENTION_MS;
+    const live = raw.filter((b) => typeof b?.ts === "number" && b.ts >= cutoff);
+    // Write back when anything lapsed, so expired data actually leaves the
+    // machine instead of merely being hidden from the list.
+    if (live.length !== raw.length) {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(live));
+      } catch {
+        /* if the write fails the filter still applies on every read */
+      }
+    }
+    return live;
   } catch {
     return [];
   }

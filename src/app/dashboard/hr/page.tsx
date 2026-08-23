@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { downloadCsv, resultsToCsv } from "@/lib/csv";
 import { fmtUsd } from "@/lib/format";
-import { loadBatches, deleteBatch, type BatchRecord } from "@/lib/history";
+import { loadBatches, deleteBatch, RETENTION_DAYS, type BatchRecord } from "@/lib/history";
 
 export default function HrDashboard() {
   const { submit, job, reset, progress, running, coldStart, etaSeconds } = useBatchJob();
@@ -227,7 +227,8 @@ export default function HrDashboard() {
                   </div>
                 ))}
                 <p className="px-2 pt-1 text-[11px] text-muted-foreground">
-                  Saved in this browser only — candidate data never leaves your machine.
+                  Saved in this browser only — candidate data never leaves your machine, and
+                  saved batches are deleted automatically after {RETENTION_DAYS} days.
                 </p>
               </CardContent>
             </Card>
