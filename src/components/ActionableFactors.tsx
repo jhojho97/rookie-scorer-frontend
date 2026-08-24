@@ -2,7 +2,6 @@
 import { Lock, Wrench, FileText } from "lucide-react";
 import type { TopFactor } from "@/types";
 import { splitFactors, factorAdvice } from "@/lib/factors";
-import { fmtContribution } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Row({ f, advice }: { f: TopFactor; advice: string | null }) {
@@ -15,13 +14,11 @@ function Row({ f, advice }: { f: TopFactor; advice: string | null }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-sm font-medium">{f.label}</span>
-          <span
-            className={`tnum shrink-0 text-xs ${
-              f.contribution >= 0 ? "text-positive" : "text-negative"
-            }`}
-          >
-            {fmtContribution(f.contribution)}
-          </span>
+          {/* The candidate's own value, not the SHAP contribution — the dot
+              already carries whether it helped or hurt. */}
+          {f.value != null && (
+            <span className="tnum shrink-0 text-xs text-muted-foreground">{String(f.value)}</span>
+          )}
         </div>
         {advice && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{advice}</p>}
       </div>
@@ -38,7 +35,12 @@ const cnTone = (v: number) =>
  * "PhD from a top-50 school" under "areas to improve" is not advice.
  */
 export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
-  const { actionable, paper, fixed } = splitFactors(factors);
+  // Factors arrive sorted by |contribution|, so slicing takes the strongest.
+  // Uncapped this would print every one of the 44 factors the API now returns.
+  const split = splitFactors(factors);
+  const actionable = split.actionable.slice(0, 5);
+  const paper = split.paper;
+  const fixed = split.fixed.slice(0, 5);
   if (!factors.length) return null;
 
   return (
@@ -52,9 +54,8 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
       </CardHeader>
       <CardContent className="space-y-5">
         <p className="text-xs leading-snug text-muted-foreground">
-          These suggestions are generated guidance, not model output. The model finds factors
-          that <em>correlate</em> with published productivity in past candidates — it cannot show
-          that changing one causes a better outcome.
+          These suggestions are generated guidance based on correlation with published
+          productivity in past candidates.
         </p>
 
         {actionable.length > 0 ? (

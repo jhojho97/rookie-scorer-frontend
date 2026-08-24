@@ -12,6 +12,16 @@ import type {
   ServerUsage,
 } from "@/types";
 
+/**
+ * How many SHAP factors to request per scoring.
+ *
+ * The report shows the top 5 in EACH direction, so asking for 5 in total left
+ * the two lists competing for the same handful. 44 is every interpretable
+ * factor the model has (27 CV + 16 external + the collapsed paper text), so
+ * both lists are drawn from the full set rather than a pre-truncated one.
+ */
+export const FACTOR_LIMIT = 44;
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -137,7 +147,7 @@ export async function predict(
   token: string,
   cv: File,
   jmp: File | null,
-  topN = 5,
+  topN = FACTOR_LIMIT,
 ): Promise<PredictionResult> {
   const form = new FormData();
   form.append("cv", cv);
@@ -155,7 +165,7 @@ export async function predict(
 export async function batchPredict(
   token: string,
   candidates: CandidateInput[],
-  topN = 5,
+  topN = FACTOR_LIMIT,
 ): Promise<BatchSubmitResponse> {
   const form = new FormData();
   const anyJmp = candidates.some((c) => c.jmp);
@@ -186,7 +196,7 @@ export async function batchPredict(
 export async function batchPredictZip(
   token: string,
   archive: File,
-  topN = 5,
+  topN = FACTOR_LIMIT,
 ): Promise<BatchSubmitResponse> {
   const form = new FormData();
   form.append("archive", archive, archive.name);

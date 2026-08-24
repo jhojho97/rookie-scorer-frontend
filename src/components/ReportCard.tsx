@@ -12,7 +12,8 @@ import { ExtractionWarning } from "./ExtractionWarning";
 import { ContributionChart } from "./ContributionChart";
 import { CostCard } from "./CostCard";
 import { FeatureAccordion } from "./FeatureAccordion";
-import { fmtContribution, toScore } from "@/lib/format";
+import { toScore } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { exportElementToPdf } from "@/lib/pdf";
 
 function FactorList({
@@ -37,12 +38,25 @@ function FactorList({
         {factors.map((f, i) => (
           <div
             key={i}
-            className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"
+            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2"
           >
-            <span className="text-sm">{f.label}</span>
-            <Badge tone={tone} className="tnum">
-              {fmtContribution(f.contribution)}
-            </Badge>
+            <span className="flex items-center gap-2 text-sm">
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  tone === "positive" ? "bg-positive" : "bg-negative",
+                )}
+                aria-hidden
+              />
+              {f.label}
+            </span>
+            {/* The candidate's own value, not the SHAP number: "3 awards" is
+                something a reader can act on, "+0.021" is not. */}
+            {f.value != null && (
+              <span className="tnum shrink-0 text-sm text-muted-foreground">
+                {String(f.value)}
+              </span>
+            )}
           </div>
         ))}
       </div>
