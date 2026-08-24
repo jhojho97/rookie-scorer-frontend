@@ -8,9 +8,10 @@ function esc(v: unknown): string {
 /** Flatten batch results to a CSV string for download. */
 export function resultsToCsv(rows: PredictionResult[]): string {
   const header = [
+    "rank",
     "candidate",
-    "percentile",
-    "raw_score",
+    "score",
+    "model_output",
     "baseline",
     "top_positive",
     "top_negative",
@@ -21,6 +22,16 @@ export function resultsToCsv(rows: PredictionResult[]): string {
     // from a genuinely low-ranking one once the data leaves the app.
     "cv_readable",
   ];
+  // Rank within the batch, best first, so the export matches the table.
+  const ranked = rows
+    .filter((r) => r.status !== "error" && typeof r.prediction === "number")
+    .sort((a, b) => b.prediction - a.prediction);
+  const rankOf = new Map<PredictionResult, number>();
+  ranked.forEach((r, i) => {
+    const prev = ranked[i - 1];
+    rankOf.set(r, prev && prev.prediction === r.prediction ? rankOf.get(prev)! : i + 1);
+  });
+
   const lines = rows.map((r) => {
     // Factors are sorted by |contribution| descending, so the FIRST match in
     // each direction is the strongest. Reversing to find the negative returned
@@ -29,8 +40,11 @@ export function resultsToCsv(rows: PredictionResult[]): string {
     const pos = factors.find((f) => f.contribution >= 0)?.label ?? "";
     const neg = factors.find((f) => f.contribution < 0)?.label ?? "";
     return [
+      rankOf.get(r) ?? "",
       r.candidate ?? r.candidate_name ?? "",
-      r.status === "error" || typeof r.percentile !== "number" ? "" : r.percentile.toFixed(1),
+      r.status === "error" || typeof r.percentile !== "number"
+        ? ""
+        : String(Math.round(r.percentile)),
       r.status === "error" ? "" : r.prediction?.toFixed(4),
       r.baseline?.toFixed(4) ?? "",
       pos,

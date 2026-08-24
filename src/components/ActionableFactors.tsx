@@ -92,7 +92,7 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
         {fixed.length > 0 && (
           <section>
             <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" /> Fixed context — not advice
+              <Lock className="h-3.5 w-3.5" /> Fixed context
             </h4>
             <ul className="mt-1 divide-y divide-border">
               {fixed.map((f, i) => (
@@ -100,8 +100,7 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
               ))}
             </ul>
             <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              The model uses these, but they describe circumstances rather than choices. They are
-              shown for transparency, not as things to change.
+              The model uses these, but they describe circumstances rather than choices.
             </p>
           </section>
         )}

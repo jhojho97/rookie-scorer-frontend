@@ -150,6 +150,7 @@ export function ReportCard({
                 baseline={result.baseline}
                 percentile={result.percentile}
                 cohortN={result.cohort_n}
+                showCohort={!isStudent}
               />
               {!isStudent && (
                 <>
@@ -159,12 +160,12 @@ export function ReportCard({
                       {delta} vs baseline
                     </Badge>
                     <span className="text-muted-foreground">
-                      raw score {toScore(result.prediction)} · baseline {toScore(result.baseline)}
+                      model output {toScore(result.prediction)} · baseline {toScore(result.baseline)}
                     </span>
                   </div>
                   <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
-                    The raw score ranks candidates but is not a calibrated probability — read the
-                    percentile, not the number out of 100.
+                    Score is this candidate&apos;s standing against the held-out cohort. The
+                    model&apos;s raw output is uncalibrated and is not a probability.
                   </p>
                   <div className="mt-4">
                     <ComponentSpread result={result} />

@@ -27,12 +27,16 @@ export function ordinal(n: number): string {
   }
 }
 
-/** Percentile for display: guards the ends so nobody reads "0th". */
-export function fmtPercentile(p: number): string {
-  if (p < 1) return "<1st";
-  if (p >= 99.5) return "top 1%";
-  return ordinal(p);
-}
+/**
+ * The headline score, 0-100.
+ *
+ * Under the hood this is the candidate's percentile against the held-out
+ * cohort, which is what makes it well-behaved: 50 really is the middle of the
+ * field, unlike the model's raw output where a median candidate scores ~18.
+ * Shown as a plain number rather than an ordinal, because it is presented to
+ * the reader as a score rather than as a rank.
+ */
+export const fmtScore = (p: number) => Math.round(Math.min(Math.max(p, 0), 100));
 
 export const fmtUsd = (v: number) =>
   v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;

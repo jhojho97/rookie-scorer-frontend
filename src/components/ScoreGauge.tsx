@@ -1,29 +1,33 @@
 "use client";
 import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from "recharts";
-import { fmtPercentile, toScore } from "@/lib/format";
+import { fmtScore, toScore } from "@/lib/format";
 
 /**
  * Headline figure for a scored candidate.
  *
- * Shows the PERCENTILE, not the raw model output. The raw score is an
- * uncalibrated ranking value — a median candidate scores about 18, which on a
- * 0-100 dial reads as a failing grade despite being exactly average. The
- * ordering is the trustworthy part, so rank is what gets the large type and
- * what fills the arc (where 0-100 genuinely means something). The raw score
- * stays visible underneath as supporting detail.
+ * The SCORE is the candidate's standing against the held-out cohort, not the
+ * model's raw output. The raw value is uncalibrated — a median candidate lands
+ * near 18, which on a 0-100 dial reads as a failing grade despite being exactly
+ * average — whereas this is well-behaved: 50 is the middle of the field.
  *
- * Falls back to the raw score when no reference cohort is available.
+ * `showCohort` prints what the score is measured against. Off for the
+ * candidate's own report, where the methodology is noise, and on for the
+ * reviewer, who needs to know what the number is relative to.
+ *
+ * Falls back to the raw model output when no reference cohort is available.
  */
 export function ScoreGauge({
   prediction,
   baseline,
   percentile,
   cohortN,
+  showCohort = true,
 }: {
   prediction: number;
   baseline: number;
   percentile?: number | null;
   cohortN?: number;
+  showCohort?: boolean;
 }) {
   const score = toScore(prediction);
   const base = toScore(baseline);
@@ -31,7 +35,7 @@ export function ScoreGauge({
   const arc = hasRank ? percentile! : score;
 
   const label = hasRank
-    ? `${fmtPercentile(percentile!)} percentile of ${cohortN ?? 0} comparable candidates. Raw model score ${score}.`
+    ? `Score ${fmtScore(percentile!)} out of 100${showCohort ? ` against ${cohortN ?? 0} comparable candidates` : ""}. Raw model output ${score}.`
     : `Model score ${score} out of 100. Cohort baseline ${base}.`;
 
   return (
@@ -52,13 +56,15 @@ export function ScoreGauge({
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden>
         {hasRank ? (
           <>
-            <span className="tnum text-4xl font-semibold tracking-tight">
-              {fmtPercentile(percentile!)}
+            <span className="tnum text-5xl font-semibold tracking-tight">
+              {fmtScore(percentile!)}
             </span>
-            <span className="text-xs text-muted-foreground">percentile</span>
-            <span className="mt-1 max-w-[7.5rem] text-center text-[11px] leading-tight text-muted-foreground">
-              of {cohortN ?? 0} comparable candidates
-            </span>
+            <span className="text-xs text-muted-foreground">score</span>
+            {showCohort && (
+              <span className="mt-1 max-w-[7.5rem] text-center text-[11px] leading-tight text-muted-foreground">
+                vs {cohortN ?? 0} comparable candidates
+              </span>
+            )}
           </>
         ) : (
           <>

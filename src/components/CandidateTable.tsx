@@ -5,7 +5,7 @@ import type { PredictionResult } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
-import { fmtPercentile } from "@/lib/format";
+import { fmtScore } from "@/lib/format";
 
 type SortKey = "candidate" | "score";
 
@@ -25,12 +25,12 @@ function topFactor(r: PredictionResult, positive: boolean) {
 /**
  * Results table for the HR workflow. Row click → full report.
  *
- * Four columns only: who, how they rank, and what stands out either way. The
- * raw score, per-candidate API cost and a status column were all removed —
- * the raw score is uncalibrated and reads as a mark out of 100 next to the
- * percentile that replaced it, and the other two are operational detail that
- * has nothing to do with comparing candidates. A failed scoring is flagged on
- * the row itself, which is the only case the status column ever carried.
+ * Shows rank within the batch, who, the score, and what stands out either way.
+ * The model's raw output, per-candidate API cost and a status column were all
+ * removed — the raw value is uncalibrated and reads as a competing mark out of
+ * 100, and the other two are operational detail with no bearing on comparing
+ * candidates. A failed scoring is flagged on the row itself, which is the only
+ * case the status column ever carried.
  */
 export function CandidateTable({
   results,
@@ -41,6 +41,26 @@ export function CandidateTable({
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "score", dir: -1 });
+
+  /**
+   * Position within THIS batch, best first.
+   *
+   * Derived from the full result set, not the rendered rows: searching or
+   * re-sorting the table must not renumber people. Ties share a rank
+   * (competition style: 1, 2, 2, 4). Candidates that failed to score have no
+   * rank — they were never placed.
+   */
+  const rankOf = useMemo(() => {
+    const scored = results
+      .filter((r) => r.status !== "error" && typeof r.prediction === "number")
+      .sort((a, b) => b.prediction - a.prediction);
+    const map = new Map<PredictionResult, number>();
+    scored.forEach((r, i) => {
+      const prev = scored[i - 1];
+      map.set(r, prev && prev.prediction === r.prediction ? map.get(prev)! : i + 1);
+    });
+    return map;
+  }, [results]);
 
   const rows = useMemo(() => {
     const name = (r: PredictionResult) => (r.candidate ?? r.candidate_name ?? "").toLowerCase();
@@ -101,14 +121,19 @@ export function CandidateTable({
                 )}
               >
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate font-medium">{candidateName(r)}</span>
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="tnum shrink-0 text-xs text-muted-foreground">
+                      {rankOf.has(r) ? `#${rankOf.get(r)}` : "—"}
+                    </span>
+                    <span className="truncate font-medium">{candidateName(r)}</span>
+                  </span>
                   {err ? (
                     <Badge tone="negative">not scored</Badge>
                   ) : r.extraction_ok === false ? (
                     <Badge tone="warning">CV unreadable</Badge>
                   ) : (
                     <span className="tnum text-lg font-semibold">
-                      {typeof r.percentile === "number" ? fmtPercentile(r.percentile) : "—"}
+                      {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
                     </span>
                   )}
                 </div>
@@ -139,10 +164,11 @@ export function CandidateTable({
         <table className="w-full min-w-[560px] text-sm">
           <thead className="bg-muted/50 text-xs text-muted-foreground">
             <tr>
+              <th className="px-3 py-2 text-left font-medium">#</th>
               <Th k="candidate" label="Candidate" />
-              {/* Sorting still keys off the raw prediction; percentile is a
+              {/* Sorting still keys off the raw prediction; the score is a
                   monotonic transform of it, so the order is identical. */}
-              <Th k="score" label="Percentile" />
+              <Th k="score" label="Score" />
               <th className="px-3 py-2 text-left font-medium">Outstanding areas</th>
               <th className="px-3 py-2 text-left font-medium">Lagging areas</th>
             </tr>
@@ -159,6 +185,9 @@ export function CandidateTable({
                     err ? "opacity-60" : "cursor-pointer hover:bg-muted/40",
                   )}
                 >
+                  <td className="tnum px-3 py-2 text-muted-foreground">
+                    {rankOf.has(r) ? rankOf.get(r) : "—"}
+                  </td>
                   <td className="px-3 py-2 font-medium">
                     <span className="flex items-center gap-2">
                       <span className="truncate">{candidateName(r)}</span>
@@ -181,7 +210,7 @@ export function CandidateTable({
                     </span>
                   </td>
                   <td className="tnum px-3 py-2 font-medium">
-                    {err ? "—" : typeof r.percentile === "number" ? fmtPercentile(r.percentile) : "—"}
+                    {err ? "—" : typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
                   </td>
                   <td className="px-3 py-2 text-positive">{err ? "—" : topFactor(r, true)}</td>
                   <td className="px-3 py-2 text-negative">{err ? "—" : topFactor(r, false)}</td>
@@ -190,7 +219,7 @@ export function CandidateTable({
             })}
             {!rows.length && (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
                   No candidates match your search.
                 </td>
               </tr>
