@@ -33,15 +33,20 @@ export function useUsage() {
     }
   }, [user, getIdToken]);
 
+  // Every component calling this hook holds its OWN server figure, so when a
+  // scoring finished it was useBatchJob's copy that refreshed while the panel
+  // kept the value it fetched at mount -- which is 0 at the start of a session,
+  // and stayed 0 all session. Refetch on the same event the local ledger uses,
+  // so one broadcast updates every instance.
   useEffect(() => {
-    refresh();
-    window.addEventListener("usage-updated", refresh);
-    return () => window.removeEventListener("usage-updated", refresh);
-  }, [refresh]);
-
-  useEffect(() => {
-    void refreshServer();
-  }, [refreshServer]);
+    const onUpdate = () => {
+      refresh();
+      void refreshServer();
+    };
+    onUpdate();
+    window.addEventListener("usage-updated", onUpdate);
+    return () => window.removeEventListener("usage-updated", onUpdate);
+  }, [refresh, refreshServer]);
 
   const add = useCallback(
     (e: Omit<UsageEvent, "ts">) => {
@@ -57,7 +62,13 @@ export function useUsage() {
     server,
     refreshServer,
     today: local.today,
-    // Prefer the server's month total; it counts every device and is enforced.
-    month: server ? { usd: server.month_usd, tokens: local.month.tokens } : local.month,
+    // The server total is authoritative — it counts every device and is what
+    // actually gates work — but never report LESS than this browser has already
+    // seen. Under-reporting spend is the dangerous direction: it shows headroom
+    // that may not exist.
+    month: {
+      usd: Math.max(server?.month_usd ?? 0, local.month.usd),
+      tokens: local.month.tokens,
+    },
   };
 }
