@@ -76,6 +76,7 @@ export default function StudentDashboard() {
                   coldStart={coldStart}
                   etaSeconds={etaSeconds}
                   unit="profile"
+                  label="Scoring your profile"
                 />
               </CardContent>
             </Card>

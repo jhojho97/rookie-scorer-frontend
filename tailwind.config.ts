@@ -35,10 +35,17 @@ const config: Config = {
       },
       keyframes: {
         shimmer: { "100%": { transform: "translateX(100%)" } },
+        // Indeterminate progress: a short bar that travels the whole track, so
+        // a single-candidate run still has something visibly moving.
+        slide: {
+          "0%": { transform: "translateX(-110%)" },
+          "100%": { transform: "translateX(410%)" },
+        },
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
       },
       animation: {
         shimmer: "shimmer 1.6s infinite",
+        slide: "slide 1.7s cubic-bezier(0.65, 0, 0.35, 1) infinite",
         "fade-in": "fade-in 0.3s ease-out",
       },
     },
