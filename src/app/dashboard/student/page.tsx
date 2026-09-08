@@ -34,6 +34,16 @@ export default function StudentDashboard() {
     "Scoring failed.";
   const showReport = done && result && result.status !== "error";
 
+  // `reset` only clears the JOB. The two File objects live here, so without
+  // this the upload card came back with the previous CV and paper still
+  // attached and "Score my profile" enabled -- one click away from silently
+  // re-scoring the same person.
+  function onReset() {
+    setCv(null);
+    setJmp(null);
+    reset();
+  }
+
   function onScore() {
     if (!cv) return;
     submit.mutate({ kind: "rows", rows: [{ id: "me", name: "Your profile", cv, jmp }] });
@@ -85,7 +95,7 @@ export default function StudentDashboard() {
           {showReport && result && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               <div className="mb-4 flex justify-end">
-                <Button variant="outline" size="sm" onClick={reset}>
+                <Button variant="outline" size="sm" onClick={onReset}>
                   Score another
                 </Button>
               </div>
@@ -97,7 +107,7 @@ export default function StudentDashboard() {
             <Card>
               <CardContent className="space-y-4 p-5">
                 <ErrorBanner error={new Error(failMsg)} />
-                <Button variant="outline" size="sm" onClick={reset}>
+                <Button variant="outline" size="sm" onClick={onReset}>
                   Try again
                 </Button>
               </CardContent>

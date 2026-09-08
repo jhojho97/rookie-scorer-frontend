@@ -56,19 +56,31 @@ export function useUsage() {
   );
 
   const local = summarize(events);
+
+  // Which figure to show.
+  //
+  // This used to be max(server, local) unconditionally, on the reasoning that
+  // under-reporting spend is the dangerous direction. That was right when the
+  // server counter was in-process and reset on every free-tier spin-up. It is
+  // now a durable per-account store, and the max was actively wrong: a browser
+  // that had done the scoring showed its own local total while a second browser
+  // on the SAME account showed the (lower) server total, so the usage appeared
+  // not to follow the account at all. It always did — only the display
+  // disagreed.
+  //
+  // So prefer the server whenever it says it is durable, which makes the number
+  // identical on every device. Keep the old max for a non-durable store, where
+  // the original reasoning still holds, and for when /usage is unreachable.
+  const serverUsd = server?.month_usd ?? 0;
+  const monthUsd = server?.durable ? serverUsd : Math.max(serverUsd, local.month.usd);
+
   return {
     events,
     add,
     server,
     refreshServer,
+    // Local-only: the server keeps a monthly total, not a daily one.
     today: local.today,
-    // The server total is authoritative — it counts every device and is what
-    // actually gates work — but never report LESS than this browser has already
-    // seen. Under-reporting spend is the dangerous direction: it shows headroom
-    // that may not exist.
-    month: {
-      usd: Math.max(server?.month_usd ?? 0, local.month.usd),
-      tokens: local.month.tokens,
-    },
+    month: { usd: monthUsd, tokens: local.month.tokens },
   };
 }

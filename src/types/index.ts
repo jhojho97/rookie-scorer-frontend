@@ -36,7 +36,11 @@ export interface ServerUsage {
   scores_last_hour: number;
   hourly_limit: number;
   enforced: boolean;
-  resets_on_restart: boolean;
+  /** True only with an external store, i.e. the monthly total survives a
+   *  restart and is a real per-account figure rather than a per-process one. */
+  durable: boolean;
+  /** "redis" | "memory" — which counter backed the numbers above. */
+  store: string;
 }
 
 export interface Extraction {
