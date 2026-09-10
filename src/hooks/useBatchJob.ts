@@ -10,8 +10,6 @@ import type { CandidateInput, JobStatusResponse } from "@/types";
 /** Either explicit candidate rows or a zip of candidate folders. */
 export type BatchInput = { kind: "rows"; rows: CandidateInput[] } | { kind: "zip"; archive: File };
 
-/** Roughly how long one candidate takes end-to-end, for the ETA. */
-const SECONDS_PER_CANDIDATE = 35;
 /** Past this with no first result, we're almost certainly waking the instance. */
 const COLD_START_HINT_MS = 20_000;
 
@@ -86,8 +84,6 @@ export function useBatchJob() {
   const elapsedMs = startedAt.current ? Date.now() - startedAt.current : 0;
   // Only claim a cold start while genuinely nothing has come back yet.
   const coldStart = running && progress.done === 0 && elapsedMs > COLD_START_HINT_MS;
-  const remaining = Math.max(progress.total - progress.done, 0);
-  const etaSeconds = running && progress.total ? remaining * SECONDS_PER_CANDIDATE : 0;
 
   const reset = () => {
     setJobId(null);
@@ -96,5 +92,5 @@ export function useBatchJob() {
     submit.reset();
   };
 
-  return { submit, job, jobId, reset, progress, running, coldStart, etaSeconds };
+  return { submit, job, jobId, reset, progress, running, coldStart };
 }

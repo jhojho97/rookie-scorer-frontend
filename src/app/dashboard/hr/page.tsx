@@ -18,7 +18,7 @@ import { fmtUsd } from "@/lib/format";
 import { loadBatches, deleteBatch, RETENTION_DAYS, type BatchRecord } from "@/lib/history";
 
 export default function HrDashboard() {
-  const { submit, job, reset, progress, running, coldStart, etaSeconds } = useBatchJob();
+  const { submit, job, reset, progress, running, coldStart } = useBatchJob();
   const [rows, setRows] = useState<CandidateInput[]>([emptyRow(), emptyRow()]);
   const [archive, setArchive] = useState<File | null>(null);
   const [selected, setSelected] = useState<PredictionResult | null>(null);
@@ -34,7 +34,8 @@ export default function HrDashboard() {
   }, []);
 
   const maxBatch = publicEnv.maxBatch;
-  const validCount = archive ? 0 : rows.filter((r) => r.cv).length;
+  const stagedCount = rows.filter((r) => r.cv).length;
+  const validCount = archive ? 0 : stagedCount;
   const canSubmit = Boolean(archive) || validCount > 0;
 
   const failed = submit.isError || job.isError || job.data?.status === "error";
@@ -110,29 +111,43 @@ export default function HrDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* BulkUpload reports the outcome of every drop through
+                    onError (a message, or null to clear the previous one), so
+                    these handlers must NOT clear it themselves -- doing so
+                    batched away the message in the same render. */}
                 <BulkUpload
+                  existing={rows}
                   onCandidates={(c) => {
                     setArchive(null);
                     setRows(c);
-                    setInputError(null);
                   }}
-                  onArchive={(f) => {
-                    setArchive(f);
-                    setInputError(null);
-                  }}
+                  onArchive={setArchive}
                   onError={setInputError}
                 />
 
                 {inputError && <ErrorBanner error={new Error(inputError)} />}
 
                 {archive ? (
-                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                    <span className="truncate">
-                      {archive.name} · {(archive.size / 1024 / 1024).toFixed(1)} MB
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={() => setArchive(null)}>
-                      Remove
-                    </Button>
+                  <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="truncate">
+                        {archive.name} · {(archive.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={() => setArchive(null)}>
+                        Remove
+                      </Button>
+                    </div>
+                    {/* A zip and loose rows are different endpoints and cannot be
+                        scored in one job, so attaching a zip hides the rows. They
+                        are NOT discarded -- but without this line the candidate
+                        the user just staged simply vanishes from the screen. */}
+                    {stagedCount > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {stagedCount} staged candidate{stagedCount === 1 ? " is" : "s are"} set
+                        aside while this zip is attached — remove the zip to get{" "}
+                        {stagedCount === 1 ? "them" : "them"} back.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <>
@@ -165,7 +180,6 @@ export default function HrDashboard() {
                   done={progress.done}
                   total={progress.total}
                   coldStart={coldStart}
-                  etaSeconds={etaSeconds}
                 />
               </CardContent>
             </Card>

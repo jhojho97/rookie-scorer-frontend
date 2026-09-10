@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
  */
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { submit, job, reset, progress, running, coldStart, etaSeconds } = useBatchJob();
+  const { submit, job, reset, progress, running, coldStart } = useBatchJob();
   const [cv, setCv] = useState<File | null>(null);
   const [jmp, setJmp] = useState<File | null>(null);
 
@@ -84,7 +84,6 @@ export default function StudentDashboard() {
                   done={progress.done}
                   total={progress.total}
                   coldStart={coldStart}
-                  etaSeconds={etaSeconds}
                   unit="profile"
                   label="Scoring your profile"
                 />

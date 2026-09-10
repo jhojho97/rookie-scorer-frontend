@@ -69,14 +69,20 @@ export function groupFiles(files: File[]): CandidateInput[] {
 }
 
 export function BulkUpload({
+  existing,
   onCandidates,
   onArchive,
   onError,
   disabled,
 }: {
+  /** Rows already staged. A drop ADDS to these rather than replacing them. */
+  existing: CandidateInput[];
+  /** The full staged list after the drop is merged in. */
   onCandidates: (c: CandidateInput[]) => void;
   onArchive: (f: File) => void;
-  onError: (msg: string) => void;
+  /** Called on EVERY drop: a message to show, or null to clear the last one.
+   *  The caller must not clear this itself -- see onDrop. */
+  onError: (msg: string | null) => void;
   disabled?: boolean;
 }) {
   const [hint, setHint] = useState<string | null>(null);
@@ -86,40 +92,95 @@ export function BulkUpload({
     (accepted: File[]) => {
       if (!accepted.length) return;
 
+      // Every message for this drop is collected and reported in ONE onError
+      // call at the end.
+      //
+      // It used to call onError() as each problem was found and then
+      // onCandidates() afterwards -- and the page's onCandidates handler
+      // cleared the error. React batches both into one update, so the clear
+      // always won and the message never appeared. Dropping 21 folders
+      // silently kept 20 of them, which is exactly the case where the user
+      // most needs to be told.
+      const problems: string[] = [];
+      const report = () => onError(problems.length ? problems.join(" ") : null);
+
       const zip = accepted.find((f) => /\.zip$/i.test(f.name));
       if (zip) {
         // A zip of candidate folders goes to the server whole — it unpacks and
         // identifies each folder's CV and JMP itself.
         onArchive(zip);
         setHint(`${zip.name} — the server will unpack it.`);
+        report();
         return;
       }
 
       const oversized = accepted.filter((f) => f.size > maxBytes);
       if (oversized.length) {
-        onError(
-          `${oversized.length} file${oversized.length === 1 ? "" : "s"} exceed ${publicEnv.maxFileMb} MB and ${
+        problems.push(
+          `${oversized.length} file${oversized.length === 1 ? "" : "s"} over ${publicEnv.maxFileMb} MB ${
             oversized.length === 1 ? "was" : "were"
-          } skipped: ${oversized.map((f) => f.name).join(", ")}`,
+          } skipped: ${oversized.map((f) => f.name).join(", ")}.`,
         );
       }
+
       const usable = accepted.filter((f) => f.size <= maxBytes);
       const grouped = groupFiles(usable);
       if (!grouped.length) {
-        onError("No PDF or DOCX files found in that drop.");
+        problems.push("No PDF or DOCX files were found in that drop.");
+        setHint(null);
+        report();
         return;
       }
-      if (grouped.length > publicEnv.maxBatch) {
-        onError(
-          `That drop contains ${grouped.length} candidates; the limit is ${publicEnv.maxBatch} per batch. Only the first ${publicEnv.maxBatch} were added.`,
+
+      // A drop ADDS to what is already staged. It used to replace it, so
+      // dragging a second candidate in silently discarded the first -- and any
+      // row typed in by hand along with it.
+      //
+      // Blank placeholder rows are not real candidates, so they make way for
+      // the drop rather than counting against the limit.
+      const staged = existing.filter((r) => r.cv);
+      const merged = [...staged];
+      let added = 0;
+      let replaced = 0;
+      for (const c of grouped) {
+        // Same person dropped twice updates that row instead of making a twin.
+        const at = merged.findIndex(
+          (r) => r.name.trim().toLowerCase() === c.name.trim().toLowerCase(),
+        );
+        if (at >= 0) {
+          merged[at] = { ...c, id: merged[at].id };
+          replaced += 1;
+        } else {
+          merged.push(c);
+          added += 1;
+        }
+      }
+
+      // The cap applies to the MERGED total, not to this drop alone.
+      const kept = merged.slice(0, publicEnv.maxBatch);
+      const dropped = merged.slice(publicEnv.maxBatch);
+      if (dropped.length) {
+        // Name who was left out. "Only the first 20 were added" does not tell
+        // the recruiter WHICH 20, and the order here is drop order, not
+        // anything they chose.
+        problems.push(
+          `That would make ${merged.length} candidates and the limit is ${publicEnv.maxBatch} per batch, ` +
+            `so ${dropped.length} ${dropped.length === 1 ? "was" : "were"} left out: ` +
+            `${dropped.map((c) => c.name).join(", ")}. Score these ${publicEnv.maxBatch} first, ` +
+            `then drop the rest as a second batch.`,
         );
       }
-      onCandidates(grouped.slice(0, publicEnv.maxBatch));
+
+      onCandidates(kept);
+      const parts = [`Added ${added}`];
+      if (replaced) parts.push(`updated ${replaced}`);
       setHint(
-        `Matched ${Math.min(grouped.length, publicEnv.maxBatch)} candidate${grouped.length === 1 ? "" : "s"} — check the pairing below.`,
+        `${parts.join(", ")} — ${kept.length} candidate${kept.length === 1 ? "" : "s"} staged. ` +
+          `Check the pairing below.`,
       );
+      report();
     },
-    [maxBytes, onArchive, onCandidates, onError],
+    [existing, maxBytes, onArchive, onCandidates, onError],
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
