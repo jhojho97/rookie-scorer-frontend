@@ -1,11 +1,11 @@
 "use client";
 import { useMemo, useState } from "react";
-import { ArrowUpDown, Search } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Search } from "lucide-react";
 import type { PredictionResult } from "@/types";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/misc";
 import { cn } from "@/lib/cn";
 import { fmtScore } from "@/lib/format";
+import { rankScored, splitResults, type FlaggedResult } from "@/lib/results";
 
 type SortKey = "candidate" | "score";
 
@@ -22,6 +22,8 @@ function topFactor(r: PredictionResult, positive: boolean) {
   return fs[0]?.label ?? "—";
 }
 
+const candidateName = (r: PredictionResult) => r.candidate ?? r.candidate_name ?? "—";
+
 /**
  * Results table for the HR workflow. Row click → full report.
  *
@@ -29,8 +31,11 @@ function topFactor(r: PredictionResult, positive: boolean) {
  * The model's raw output, per-candidate API cost and a status column were all
  * removed — the raw value is uncalibrated and reads as a competing mark out of
  * 100, and the other two are operational detail with no bearing on comparing
- * candidates. A failed scoring is flagged on the row itself, which is the only
- * case the status column ever carried.
+ * candidates.
+ *
+ * Only candidates with a usable score are ranked. A failed scoring, or a CV
+ * that could not be read, is listed in its own "Not scored" section instead
+ * (see lib/results.ts for why an unreadable CV's number cannot be ranked).
  */
 export function CandidateTable({
   results,
@@ -42,34 +47,24 @@ export function CandidateTable({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "score", dir: -1 });
 
+  const { scored, flagged } = useMemo(() => splitResults(results), [results]);
+
   /**
-   * Position within THIS batch, best first.
+   * Position within THIS batch, best first, among scored candidates only.
    *
-   * Derived from the full result set, not the rendered rows: searching or
-   * re-sorting the table must not renumber people. Ties share a rank
-   * (competition style: 1, 2, 2, 4). Candidates that failed to score have no
-   * rank — they were never placed.
+   * Derived from the full scored set, not the rendered rows: searching or
+   * re-sorting the table must not renumber people.
    */
-  const rankOf = useMemo(() => {
-    const scored = results
-      .filter((r) => r.status !== "error" && typeof r.prediction === "number")
-      .sort((a, b) => b.prediction - a.prediction);
-    const map = new Map<PredictionResult, number>();
-    scored.forEach((r, i) => {
-      const prev = scored[i - 1];
-      map.set(r, prev && prev.prediction === r.prediction ? map.get(prev)! : i + 1);
-    });
-    return map;
-  }, [results]);
+  const rankOf = useMemo(() => rankScored(scored), [scored]);
 
   const rows = useMemo(() => {
     const name = (r: PredictionResult) => (r.candidate ?? r.candidate_name ?? "").toLowerCase();
-    const filtered = results.filter((r) => name(r).includes(query.toLowerCase()));
+    const filtered = scored.filter((r) => name(r).includes(query.toLowerCase()));
     return filtered.sort((a, b) => {
       if (sort.key === "candidate") return name(a).localeCompare(name(b)) * sort.dir;
-      return ((a.prediction ?? -1) - (b.prediction ?? -1)) * sort.dir;
+      return (a.prediction - b.prediction) * sort.dir;
     });
-  }, [results, query, sort]);
+  }, [scored, query, sort]);
 
   const toggle = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: (s.dir * -1) as 1 | -1 } : { key, dir: -1 }));
@@ -90,54 +85,47 @@ export function CandidateTable({
     </th>
   );
 
-  const candidateName = (r: PredictionResult) => r.candidate ?? r.candidate_name ?? "—";
-
   return (
     <div className="space-y-3">
-      <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search candidates…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+      {flagged.length > 0 && <NotScored flagged={flagged} />}
 
-      {/* Mobile: the table still doesn't fit below ~560px, so present each
-          candidate as a card instead of forcing a horizontal scroll. */}
-      <ul className="space-y-2 sm:hidden">
-        {rows.map((r, i) => {
-          const err = r.status === "error";
-          return (
-            <li key={i}>
-              <button
-                type="button"
-                disabled={err}
-                onClick={() => !err && onSelect(r)}
-                className={cn(
-                  "w-full rounded-lg border border-border p-3 text-left",
-                  err ? "opacity-60" : "hover:bg-muted/40",
-                )}
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className="tnum shrink-0 text-xs text-muted-foreground">
-                      {rankOf.has(r) ? `#${rankOf.get(r)}` : "—"}
+      {scored.length === 0 ? (
+        <p className="rounded-lg border border-border px-3 py-8 text-center text-sm text-muted-foreground">
+          No candidate in this batch could be scored.
+        </p>
+      ) : (
+        <>
+          <div className="relative max-w-xs">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search candidates…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Mobile: the table still doesn't fit below ~560px, so present each
+              candidate as a card instead of forcing a horizontal scroll. */}
+          <ul className="space-y-2 sm:hidden">
+            {rows.map((r, i) => (
+              <li key={i}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(r)}
+                  className="w-full rounded-lg border border-border p-3 text-left hover:bg-muted/40"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="tnum shrink-0 text-xs text-muted-foreground">
+                        #{rankOf.get(r)}
+                      </span>
+                      <span className="truncate font-medium">{candidateName(r)}</span>
                     </span>
-                    <span className="truncate font-medium">{candidateName(r)}</span>
-                  </span>
-                  {err ? (
-                    <Badge tone="negative">not scored</Badge>
-                  ) : r.extraction_ok === false ? (
-                    <Badge tone="warning">CV unreadable</Badge>
-                  ) : (
                     <span className="tnum text-lg font-semibold">
                       {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
                     </span>
-                  )}
-                </div>
-                {!err && (
+                  </div>
                   <dl className="mt-2 space-y-1 text-xs">
                     <div className="flex justify-between gap-3">
                       <dt className="text-muted-foreground">Outstanding</dt>
@@ -148,85 +136,97 @@ export function CandidateTable({
                       <dd className="truncate text-negative">{topFactor(r, false)}</dd>
                     </div>
                   </dl>
-                )}
-              </button>
-            </li>
-          );
-        })}
-        {!rows.length && (
-          <li className="rounded-lg border border-border px-3 py-8 text-center text-sm text-muted-foreground">
-            No candidates match your search.
-          </li>
-        )}
-      </ul>
-
-      <div className="hidden overflow-x-auto rounded-lg border border-border sm:block">
-        <table className="w-full min-w-[560px] text-sm">
-          <thead className="bg-muted/50 text-xs text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">#</th>
-              <Th k="candidate" label="Candidate" />
-              {/* Sorting still keys off the raw prediction; the score is a
-                  monotonic transform of it, so the order is identical. */}
-              <Th k="score" label="Score" />
-              <th className="px-3 py-2 text-left font-medium">Outstanding areas</th>
-              <th className="px-3 py-2 text-left font-medium">Lagging areas</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {rows.map((r, i) => {
-              const err = r.status === "error";
-              return (
-                <tr
-                  key={i}
-                  onClick={() => !err && onSelect(r)}
-                  className={cn(
-                    "transition-colors",
-                    err ? "opacity-60" : "cursor-pointer hover:bg-muted/40",
-                  )}
-                >
-                  <td className="tnum px-3 py-2 text-muted-foreground">
-                    {rankOf.has(r) ? rankOf.get(r) : "—"}
-                  </td>
-                  <td className="px-3 py-2 font-medium">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate">{candidateName(r)}</span>
-                      {/* Without a status column these are the only signals that
-                          a row failed, or was scored on an unreadable CV, rather
-                          than simply ranking low. */}
-                      {err && (
-                        <Badge tone="negative" title={r.reason ?? undefined}>
-                          not scored
-                        </Badge>
-                      )}
-                      {!err && r.extraction_ok === false && (
-                        <Badge
-                          tone="warning"
-                          title={(r.extraction_problems ?? []).join(" ") || undefined}
-                        >
-                          CV unreadable
-                        </Badge>
-                      )}
-                    </span>
-                  </td>
-                  <td className="tnum px-3 py-2 font-medium">
-                    {err ? "—" : typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-positive">{err ? "—" : topFactor(r, true)}</td>
-                  <td className="px-3 py-2 text-negative">{err ? "—" : topFactor(r, false)}</td>
-                </tr>
-              );
-            })}
+                </button>
+              </li>
+            ))}
             {!rows.length && (
-              <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                  No candidates match your search.
-                </td>
-              </tr>
+              <li className="rounded-lg border border-border px-3 py-8 text-center text-sm text-muted-foreground">
+                No candidates match your search.
+              </li>
             )}
-          </tbody>
-        </table>
-      </div>
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border sm:block">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead className="bg-muted/50 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">#</th>
+                  <Th k="candidate" label="Candidate" />
+                  {/* Sorting still keys off the raw prediction; the score is a
+                      monotonic transform of it, so the order is identical. */}
+                  <Th k="score" label="Score" />
+                  <th className="px-3 py-2 text-left font-medium">Outstanding areas</th>
+                  <th className="px-3 py-2 text-left font-medium">Lagging areas</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((r, i) => (
+                  <tr
+                    key={i}
+                    onClick={() => onSelect(r)}
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                  >
+                    <td className="tnum px-3 py-2 text-muted-foreground">{rankOf.get(r)}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <span className="block truncate">{candidateName(r)}</span>
+                    </td>
+                    <td className="tnum px-3 py-2 font-medium">
+                      {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-positive">{topFactor(r, true)}</td>
+                    <td className="px-3 py-2 text-negative">{topFactor(r, false)}</td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                      No candidates match your search.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Candidates left out of the ranking, each with what went wrong and what to do.
+ * Shown ABOVE the table: a missing candidate is easy to overlook below it.
+ */
+function NotScored({ flagged }: { flagged: FlaggedResult[] }) {
+  const n = flagged.length;
+  return (
+    <section
+      aria-labelledby="not-scored-title"
+      className="rounded-lg border border-warning/40 bg-warning/5 p-3"
+    >
+      <h3 id="not-scored-title" className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+        {n} candidate{n === 1 ? "" : "s"} not scored
+        <span className="font-normal text-muted-foreground">
+          · left out of the ranking and the CSV
+        </span>
+      </h3>
+      <ul className="mt-2 divide-y divide-border">
+        {flagged.map((f, i) => (
+          <li key={i} className="grid gap-1 py-2 sm:grid-cols-[minmax(8rem,12rem)_1fr] sm:gap-4">
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate font-medium">{candidateName(f.result)}</span>
+              <span className="text-xs text-muted-foreground">
+                {f.kind === "unreadable" ? "CV could not be read" : "Scoring failed"}
+              </span>
+            </span>
+            <span className="text-sm">
+              <span className="block text-muted-foreground">{f.reason}</span>
+              <span className="block">{f.action}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

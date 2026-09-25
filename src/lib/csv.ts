@@ -1,4 +1,5 @@
 import type { PredictionResult } from "@/types";
+import { rankScored, splitResults } from "@/lib/results";
 
 function esc(v: unknown): string {
   const s = v == null ? "" : String(v);
@@ -7,32 +8,18 @@ function esc(v: unknown): string {
 
 /** Flatten batch results to a CSV string for download. */
 export function resultsToCsv(rows: PredictionResult[]): string {
-  const header = [
-    "rank",
-    "candidate",
-    "score",
-    "model_output",
-    "baseline",
-    "top_positive",
-    "top_negative",
-    "cost_usd",
-    "tokens",
-    "status",
-    // Without this, a row scored from an unreadable CV is indistinguishable
-    // from a genuinely low-ranking one once the data leaves the app.
-    "cv_readable",
-  ];
-  // Rank within the batch, best first, so the export matches the table.
-  const ranked = rows
-    .filter((r) => r.status !== "error" && typeof r.prediction === "number")
-    .sort((a, b) => b.prediction - a.prediction);
-  const rankOf = new Map<PredictionResult, number>();
-  ranked.forEach((r, i) => {
-    const prev = ranked[i - 1];
-    rankOf.set(r, prev && prev.prediction === r.prediction ? rankOf.get(prev)! : i + 1);
-  });
+  // Recruiter-facing columns only. Model internals (raw output, baseline),
+  // metering (cost, tokens) and pipeline state (status, CV readability) stay
+  // in the app, where the report and the table already surface them.
+  const header = ["rank", "candidate", "score", "top_positive", "top_negative"];
+  // Only scored candidates, ranked exactly as the table ranks them. Failed
+  // scorings and unreadable CVs are listed separately in the app, never here,
+  // so a number that does not describe the candidate cannot leave the app.
+  const { scored } = splitResults(rows);
+  const rankOf = rankScored(scored);
+  const ordered = [...scored].sort((a, b) => rankOf.get(a)! - rankOf.get(b)!);
 
-  const lines = rows.map((r) => {
+  const lines = ordered.map((r) => {
     // Factors are sorted by |contribution| descending, so the FIRST match in
     // each direction is the strongest. Reversing to find the negative returned
     // the weakest detractor instead — the same bug the results table had.
@@ -42,17 +29,9 @@ export function resultsToCsv(rows: PredictionResult[]): string {
     return [
       rankOf.get(r) ?? "",
       r.candidate ?? r.candidate_name ?? "",
-      r.status === "error" || typeof r.percentile !== "number"
-        ? ""
-        : String(Math.round(r.percentile)),
-      r.status === "error" ? "" : r.prediction?.toFixed(4),
-      r.baseline?.toFixed(4) ?? "",
+      typeof r.percentile === "number" ? String(Math.round(r.percentile)) : "",
       pos,
       neg,
-      r.cost?.usd?.toFixed(6) ?? "",
-      r.cost?.total_tokens ?? "",
-      r.status === "error" ? `error: ${r.reason ?? ""}` : "ok",
-      r.extraction_ok === false ? "no" : "yes",
     ]
       .map(esc)
       .join(",");
