@@ -161,6 +161,12 @@ export function ReportCard({
                 cohortN={result.cohort_n}
                 showCohort={!isStudent}
               />
+              {result.paper_used === false && (
+                <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
+                  No readable job-market paper was provided, so this score is based on the CV
+                  alone.
+                </p>
+              )}
               {!isStudent && (
                 <>
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">

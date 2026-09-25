@@ -73,6 +73,10 @@ export interface PredictionResult {
   prediction: number; // 0..1
   baseline: number; // 0..1
   sets_used: string[];
+  /** False when no readable job-market paper was given: the score then rests
+   *  on the CV and external metrics only, ranked against the cohort scored the
+   *  same way. Absent on results from before this field existed. */
+  paper_used?: boolean;
   sets_skipped: string[];
   /**
    * Each feature set's own probability before ensembling. Their spread shows
