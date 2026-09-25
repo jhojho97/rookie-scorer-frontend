@@ -14,7 +14,7 @@ import { CostCard } from "./CostCard";
 import { FeatureAccordion } from "./FeatureAccordion";
 import { toScore } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { exportElementToPdf } from "@/lib/pdf";
+import { printReport } from "@/lib/printReport";
 
 function FactorList({
   title,
@@ -107,7 +107,10 @@ export function ReportCard({
     if (!ref.current) return;
     setExporting(true);
     try {
-      await exportElementToPdf(ref.current, `${name.replace(/\s+/g, "_")}_report.pdf`);
+      await printReport(ref.current, `${name.replace(/\s+/g, "_")}_report`, {
+        title: name,
+        subtitle: scoredAt ? `Scored ${scoredAt.toLocaleString()}` : undefined,
+      });
     } finally {
       setExporting(false);
     }
@@ -129,9 +132,15 @@ export function ReportCard({
             · target {result.target}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+          title="Opens the print dialog. Choose Save as PDF as the destination."
+        >
           {exporting ? <Spinner /> : <Download className="h-4 w-4" />}
-          Download PDF
+          Save as PDF
         </Button>
       </div>
 

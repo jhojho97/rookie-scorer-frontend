@@ -77,3 +77,54 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Report printing (see lib/printReport.ts) ─────────────────────────────── */
+
+/* A PDF is paper: always the light palette, whatever theme the screen is in.
+   Declared on the container rather than :root so no theme rule can outrank it. */
+#print-root {
+  --background: 0 0% 100%;
+  --foreground: 215 25% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 215 25% 15%;
+  --muted: 215 20% 96%;
+  --muted-foreground: 215 12% 45%;
+  --border: 215 18% 90%;
+  --input: 215 18% 88%;
+  --ring: 215 30% 55%;
+  --accent: 215 45% 42%;
+  --accent-foreground: 0 0% 100%;
+  --positive: 158 42% 38%;
+  --negative: 4 55% 50%;
+  --warning: 35 55% 45%;
+  /* Off-screen while it is measured; placed on the page only when printing. */
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+#print-root,
+#print-root * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+#print-root .print-frame { overflow: hidden; }
+#print-root .print-sheet { transform-origin: top left; }
+#print-root .print-head { margin-bottom: 16px; }
+#print-root .print-head h1 { margin: 0; font-size: 22px; font-weight: 600; }
+#print-root .print-head p { margin: 2px 0 0; font-size: 13px; color: hsl(var(--muted-foreground)); }
+/* The printable width is below the md breakpoint, which would stack the two-
+   column rows. Pin them, so print matches what was measured. */
+#print-root .md\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Charts keep the pixel size they were drawn at; let them fit their column. */
+#print-root .recharts-wrapper { width: 100% !important; height: auto !important; }
+#print-root svg.recharts-surface { max-width: 100%; height: auto; }
+
+@page { size: A4 portrait; margin: 12mm; }
+
+@media print {
+  body.printing-report { margin: 0 !important; background: #fff !important; }
+  body.printing-report > *:not(#print-root) { display: none !important; }
+  body.printing-report #print-root { position: static; left: auto; }
+}
