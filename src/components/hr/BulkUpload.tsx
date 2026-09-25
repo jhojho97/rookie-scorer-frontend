@@ -5,68 +5,7 @@ import { FileArchive, FolderUp, UploadCloud } from "lucide-react";
 import type { CandidateInput } from "@/types";
 import { publicEnv } from "@/lib/env";
 import { cn } from "@/lib/cn";
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-
-/** Filenames that look like a CV rather than a paper. */
-const CV_HINT = /\b(cv|resume|vita|vitae)\b/i;
-const DOC_EXT = /\.(pdf|docx)$/i;
-
-/** Strip extension and CV/JMP words to get at the person's name. */
-function candidateKey(filename: string): string {
-  return filename
-    .replace(DOC_EXT, "")
-    .replace(/\b(cv|resume|vita|vitae|jmp|job.?market.?paper|paper|draft)\b/gi, "")
-    .replace(/[_\-.]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function prettyName(key: string): string {
-  return key.replace(/\b\w/g, (c) => c.toUpperCase()) || "Candidate";
-}
-
-/**
- * Group dropped files into candidates.
- *
- * Two shapes are handled, because both are how these files actually arrive:
- *  - a folder per candidate (relative paths from a directory drop), and
- *  - loose files named "Smith_CV.pdf" / "Smith_JMP.pdf".
- * Within a group the CV is the file whose name says so, else the smaller file —
- * a job-market paper is essentially always longer than a CV.
- */
-export function groupFiles(files: File[]): CandidateInput[] {
-  const docs = files.filter((f) => DOC_EXT.test(f.name));
-  const groups = new Map<string, File[]>();
-
-  for (const f of docs) {
-    const rel = (f as File & { path?: string; webkitRelativePath?: string });
-    const relPath = rel.webkitRelativePath || rel.path || "";
-    const parts = relPath.split("/").filter(Boolean);
-    // A directory drop gives "batch/Smith Jane/cv.pdf" -> group on "Smith Jane".
-    const folder = parts.length >= 2 ? parts[parts.length - 2] : "";
-    const key = folder ? folder.toLowerCase() : candidateKey(f.name) || f.name.toLowerCase();
-    groups.set(key, [...(groups.get(key) ?? []), f]);
-  }
-
-  return [...groups.entries()].map(([key, fs]) => {
-    let cv: File | null = null;
-    let jmp: File | null = null;
-    const named = fs.filter((f) => CV_HINT.test(f.name));
-    if (named.length) {
-      cv = named[0];
-      jmp = fs.find((f) => f !== cv) ?? null;
-    } else if (fs.length === 1) {
-      cv = fs[0];
-    } else {
-      const sorted = [...fs].sort((a, b) => a.size - b.size);
-      cv = sorted[0];
-      jmp = sorted[sorted.length - 1];
-    }
-    return { id: uid(), name: prettyName(key), cv, jmp };
-  });
-}
+import { groupFiles } from "@/lib/groupFiles";
 
 export function BulkUpload({
   existing,
