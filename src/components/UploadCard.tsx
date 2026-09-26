@@ -13,12 +13,14 @@ const ACCEPT = {
 export interface UploadCardProps {
   label: string;
   optional?: boolean;
+  /** One line of guidance under the label. */
+  hint?: string;
   file: File | null;
   onChange: (f: File | null) => void;
 }
 
 /** Drag-and-drop file input with validation, filename preview and remove. */
-export function UploadCard({ label, optional, file, onChange }: UploadCardProps) {
+export function UploadCard({ label, optional, hint, file, onChange }: UploadCardProps) {
   const maxBytes = publicEnv.maxFileMb * 1024 * 1024;
 
   const onDrop = useCallback(
@@ -47,6 +49,7 @@ export function UploadCard({ label, optional, file, onChange }: UploadCardProps)
         <span className="text-sm font-medium">{label}</span>
         {optional && <span className="text-xs text-muted-foreground">(optional)</span>}
       </div>
+      {hint && <p className="text-xs leading-snug text-muted-foreground">{hint}</p>}
 
       {file ? (
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 p-3">

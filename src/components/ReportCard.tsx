@@ -9,7 +9,6 @@ import { ScoreGauge } from "./ScoreGauge";
 import { ActionableFactors } from "./ActionableFactors";
 import { ComponentSpread } from "./ComponentSpread";
 import { ExtractionWarning } from "./ExtractionWarning";
-import { ContributionChart } from "./ContributionChart";
 import { CostCard } from "./CostCard";
 import { FeatureAccordion } from "./FeatureAccordion";
 import { toScore } from "@/lib/format";
@@ -148,57 +147,49 @@ export function ReportCard({
           warning, so an unreliable score stays labelled once exported. */}
       <div ref={ref} className="space-y-4 rounded-lg">
         <ExtractionWarning result={result} />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Research productivity ranking</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScoreGauge
-                prediction={result.prediction}
-                baseline={result.baseline}
-                percentile={result.percentile}
-                cohortN={result.cohort_n}
-                showCohort={!isStudent}
-              />
-              {result.paper_used === false && (
-                <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
-                  No readable job-market paper was provided, so this score is based on the CV
-                  alone.
+        {/* Full width: the Contribution breakdown chart that sat beside this was
+            removed -- its factors are the ones already listed under Outstanding
+            and Lagging areas, so it repeated them as bars. */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Research productivity ranking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScoreGauge
+              prediction={result.prediction}
+              baseline={result.baseline}
+              percentile={result.percentile}
+              cohortN={result.cohort_n}
+              showCohort={!isStudent}
+            />
+            {result.paper_used === false && (
+              <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
+                No readable job-market paper was provided, so this score is based on the CV
+                alone.
+              </p>
+            )}
+            {!isStudent && (
+              <>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
+                  <Badge tone={delta >= 0 ? "positive" : "negative"}>
+                    {delta >= 0 ? "+" : ""}
+                    {delta} vs baseline
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    model output {toScore(result.prediction)} · baseline {toScore(result.baseline)}
+                  </span>
+                </div>
+                <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
+                  Score is this candidate&apos;s standing against the held-out cohort. The
+                  model&apos;s raw output is uncalibrated and is not a probability.
                 </p>
-              )}
-              {!isStudent && (
-                <>
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-sm">
-                    <Badge tone={delta >= 0 ? "positive" : "negative"}>
-                      {delta >= 0 ? "+" : ""}
-                      {delta} vs baseline
-                    </Badge>
-                    <span className="text-muted-foreground">
-                      model output {toScore(result.prediction)} · baseline {toScore(result.baseline)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
-                    Score is this candidate&apos;s standing against the held-out cohort. The
-                    model&apos;s raw output is uncalibrated and is not a probability.
-                  </p>
-                  <div className="mt-4">
-                    <ComponentSpread result={result} />
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Contribution breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ContributionChart factors={factors} />
-            </CardContent>
-          </Card>
-        </div>
+                <div className="mt-4">
+                  <ComponentSpread result={result} />
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* Same wording as the results table, so a recruiter clicking through

@@ -125,6 +125,12 @@ export default function HrDashboard() {
                   onError={setInputError}
                 />
 
+                {/* Applies to every upload route on this card: bulk drop, zip and rows. */}
+                <p className="text-xs leading-snug text-muted-foreground">
+                  For each job-market paper, only the title, abstract and introduction are extracted
+                  and used for scoring. Upload the full paper; the rest is ignored.
+                </p>
+
                 {inputError && <ErrorBanner error={new Error(inputError)} />}
 
                 {archive ? (

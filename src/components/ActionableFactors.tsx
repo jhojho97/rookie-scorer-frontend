@@ -1,5 +1,5 @@
 "use client";
-import { Lock, Wrench, FileText } from "lucide-react";
+import { Wrench } from "lucide-react";
 import type { TopFactor } from "@/types";
 import { splitFactors, factorAdvice } from "@/lib/factors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,17 +30,16 @@ const cnTone = (v: number) =>
   `mt-1.5 h-2 w-2 shrink-0 rounded-full ${v >= 0 ? "bg-positive" : "bg-negative"}`;
 
 /**
- * Turns the SHAP factor list into something a candidate can act on, by
- * separating levers they control from context they cannot change. Listing
- * "PhD from a top-50 school" under "areas to improve" is not advice.
+ * Turns the SHAP factor list into something a candidate can act on.
+ *
+ * Only the levers are shown: factors the candidate controls, each with a tip.
+ * The "Fixed context" and "Your paper" groups were removed -- neither gave the
+ * candidate anything to do, and the strongest of those factors already appear
+ * under Outstanding and Lagging areas.
  */
 export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
   // Factors arrive sorted by |contribution|, so slicing takes the strongest.
-  // Uncapped this would print every one of the 44 factors the API now returns.
-  const split = splitFactors(factors);
-  const actionable = split.actionable.slice(0, 5);
-  const paper = split.paper;
-  const fixed = split.fixed.slice(0, 5);
+  const levers = splitFactors(factors).actionable.slice(0, 5);
   if (!factors.length) return null;
 
   return (
@@ -49,60 +48,39 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
         {/* Named "AI suggested" on purpose: these sentences are authored
             guidance keyed to each feature, NOT model output. SHAP contributions
             are associational, so acting on them moves a correlate, not a proven
-            cause — the heading has to carry that disclaimer. */}
+            cause -- the heading has to carry that disclaimer. */}
         <CardTitle>AI suggested actions to improve scoring</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <p className="text-xs leading-snug text-muted-foreground">
-          These suggestions are generated guidance based on correlation with published
-          productivity in past candidates.
-        </p>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5 text-xs leading-snug text-muted-foreground">
+          <p>
+            These suggestions are generated guidance based on correlation with published
+            productivity in past candidates.
+          </p>
+          <p>
+            The levers are chosen using SHAP values, which measure how much each factor pushed
+            this score up or down. They are the factors within your control that had the largest
+            effect, strongest first. A green dot means the factor raised the score; red means it
+            lowered it.
+          </p>
+        </div>
 
-        {actionable.length > 0 ? (
+        {levers.length > 0 ? (
           <section>
             <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <Wrench className="h-3.5 w-3.5" /> Levers
             </h4>
             <ul className="mt-1 divide-y divide-border">
-              {actionable.map((f, i) => (
+              {levers.map((f, i) => (
                 <Row key={i} f={f} advice={factorAdvice(f)} />
               ))}
             </ul>
           </section>
         ) : (
           <p className="text-sm text-muted-foreground">
-            None of this candidate&apos;s strongest factors are ones they can change directly —
-            the score is driven by fixed context below.
+            None of the factors that shaped this score are ones you can change directly, such as
+            publications, R&amp;Rs or presentations.
           </p>
-        )}
-
-        {paper.length > 0 && (
-          <section>
-            <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <FileText className="h-3.5 w-3.5" /> Your paper
-            </h4>
-            <ul className="mt-1 divide-y divide-border">
-              {paper.map((f, i) => (
-                <Row key={i} f={f} advice={factorAdvice(f)} />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {fixed.length > 0 && (
-          <section>
-            <h4 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" /> Fixed context
-            </h4>
-            <ul className="mt-1 divide-y divide-border">
-              {fixed.map((f, i) => (
-                <Row key={i} f={f} advice={null} />
-              ))}
-            </ul>
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-              The model uses these, but they describe circumstances rather than choices.
-            </p>
-          </section>
         )}
       </CardContent>
     </Card>

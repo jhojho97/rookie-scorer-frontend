@@ -67,7 +67,13 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <UploadCard label="CV" file={cv} onChange={setCv} />
-                <UploadCard label="Job-market paper" optional file={jmp} onChange={setJmp} />
+                <UploadCard
+                  label="Job-market paper"
+                  optional
+                  hint="Upload the full paper. Only its title, abstract and introduction are extracted and used for scoring; the rest is ignored."
+                  file={jmp}
+                  onChange={setJmp}
+                />
                 <Button onClick={onScore} disabled={!cv} className="w-full">
                   <Sparkles className="h-4 w-4" />
                   Score my profile
