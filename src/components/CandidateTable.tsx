@@ -5,7 +5,7 @@ import type { PredictionResult } from "@/types";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { fmtScore } from "@/lib/format";
-import { rankScored, splitResults, type FlaggedResult } from "@/lib/results";
+import { rankScored, rankValue, splitResults, type FlaggedResult } from "@/lib/results";
 
 type SortKey = "candidate" | "score";
 
@@ -62,7 +62,7 @@ export function CandidateTable({
     const filtered = scored.filter((r) => name(r).includes(query.toLowerCase()));
     return filtered.sort((a, b) => {
       if (sort.key === "candidate") return name(a).localeCompare(name(b)) * sort.dir;
-      return (a.prediction - b.prediction) * sort.dir;
+      return (rankValue(a) - rankValue(b)) * sort.dir;
     });
   }, [scored, query, sort]);
 
@@ -121,6 +121,7 @@ export function CandidateTable({
                         #{rankOf.get(r)}
                       </span>
                       <span className="truncate font-medium">{candidateName(r)}</span>
+                      <NoJmp r={r} />
                     </span>
                     <span className="tnum text-lg font-semibold">
                       {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
@@ -152,8 +153,7 @@ export function CandidateTable({
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">#</th>
                   <Th k="candidate" label="Candidate" />
-                  {/* Sorting still keys off the raw prediction; the score is a
-                      monotonic transform of it, so the order is identical. */}
+                  {/* Sorts by the score itself, the same value the rank uses. */}
                   <Th k="score" label="Score" />
                   <th className="px-3 py-2 text-left font-medium">Outstanding areas</th>
                   <th className="px-3 py-2 text-left font-medium">Lagging areas</th>
@@ -168,7 +168,10 @@ export function CandidateTable({
                   >
                     <td className="tnum px-3 py-2 text-muted-foreground">{rankOf.get(r)}</td>
                     <td className="px-3 py-2 font-medium">
-                      <span className="block truncate">{candidateName(r)}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{candidateName(r)}</span>
+                        <NoJmp r={r} />
+                      </span>
                     </td>
                     <td className="tnum px-3 py-2 font-medium">
                       {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
@@ -190,6 +193,23 @@ export function CandidateTable({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Marks a candidate scored without a job-market paper. They are ranked with
+ * everyone else -- their score is against the same reference candidates,
+ * scored the same way -- but the reader should know it rests on the CV alone.
+ */
+function NoJmp({ r }: { r: PredictionResult }) {
+  if (r.paper_used !== false) return null;
+  return (
+    <span
+      className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+      title="No readable job-market paper was provided, so this score is based on the CV alone."
+    >
+      No JMP
+    </span>
   );
 }
 

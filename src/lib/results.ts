@@ -60,15 +60,29 @@ export function splitResults(results: PredictionResult[]) {
 }
 
 /**
+ * The number candidates are compared on: the score, not the raw prediction.
+ *
+ * A candidate without a paper is scored by two models and one with a paper by
+ * three, so their raw predictions sit on different scales -- a CV-only raw
+ * value averages 0.200 where a with-paper one averages 0.220. Ranking on the
+ * raw value put 8% of mixed pairs in the wrong order, one of them 21 points
+ * apart. The score is each candidate ranked against the same 131 reference
+ * candidates scored the same way, so it is the one number that is comparable
+ * across the two.
+ */
+export const rankValue = (r: PredictionResult) =>
+  typeof r.percentile === "number" ? r.percentile : -1;
+
+/**
  * Position within the batch among SCORED candidates only, best first.
  * Competition style: ties share a rank (1, 2, 2, 4).
  */
 export function rankScored(scored: PredictionResult[]): Map<PredictionResult, number> {
-  const order = [...scored].sort((a, b) => b.prediction - a.prediction);
+  const order = [...scored].sort((a, b) => rankValue(b) - rankValue(a));
   const map = new Map<PredictionResult, number>();
   order.forEach((r, i) => {
     const prev = order[i - 1];
-    map.set(r, prev && prev.prediction === r.prediction ? map.get(prev)! : i + 1);
+    map.set(r, prev && rankValue(prev) === rankValue(r) ? map.get(prev)! : i + 1);
   });
   return map;
 }
