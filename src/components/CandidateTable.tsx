@@ -4,8 +4,9 @@ import { AlertTriangle, ArrowUpDown, Search } from "lucide-react";
 import type { PredictionResult } from "@/types";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
-import { fmtScore } from "@/lib/format";
+import { toScore } from "@/lib/format";
 import { rankScored, rankValue, splitResults, type FlaggedResult } from "@/lib/results";
+import { DEFAULT_TARGET, forTarget, type TargetKey } from "@/lib/targets";
 
 type SortKey = "candidate" | "score";
 
@@ -40,14 +41,20 @@ const candidateName = (r: PredictionResult) => r.candidate ?? r.candidate_name ?
 export function CandidateTable({
   results,
   onSelect,
+  target = DEFAULT_TARGET,
 }: {
   results: PredictionResult[];
   onSelect: (r: PredictionResult) => void;
+  /** The research-productivity level to rank and describe candidates at. */
+  target?: TargetKey;
 }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "score", dir: -1 });
 
-  const { scored, flagged } = useMemo(() => splitResults(results), [results]);
+  // Each candidate as seen at the chosen target. Rank, sort and the factor
+  // columns all follow it; the Not scored section does not depend on it.
+  const viewed = useMemo(() => results.map((r) => forTarget(r, target) ?? r), [results, target]);
+  const { scored, flagged } = useMemo(() => splitResults(viewed), [viewed]);
 
   /**
    * Position within THIS batch, best first, among scored candidates only.
@@ -124,7 +131,7 @@ export function CandidateTable({
                       <NoJmp r={r} />
                     </span>
                     <span className="tnum text-lg font-semibold">
-                      {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
+                      {typeof r.prediction === "number" ? toScore(r.prediction) : "—"}
                     </span>
                   </div>
                   <dl className="mt-2 space-y-1 text-xs">
@@ -174,7 +181,7 @@ export function CandidateTable({
                       </span>
                     </td>
                     <td className="tnum px-3 py-2 font-medium">
-                      {typeof r.percentile === "number" ? fmtScore(r.percentile) : "—"}
+                      {typeof r.prediction === "number" ? toScore(r.prediction) : "—"}
                     </td>
                     <td className="px-3 py-2 text-positive">{topFactor(r, true)}</td>
                     <td className="px-3 py-2 text-negative">{topFactor(r, false)}</td>

@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBatchJob } from "@/hooks/useBatchJob";
 import { UploadCard } from "@/components/UploadCard";
 import { ReportCard } from "@/components/ReportCard";
+import { TargetSelector, useTargetChoice } from "@/components/TargetSelector";
+import { availableTargets, resolveTarget } from "@/lib/targets";
 import { UsageDashboard } from "@/components/UsageDashboard";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { JobProgress } from "@/components/JobProgress";
@@ -33,6 +35,9 @@ export default function StudentDashboard() {
     job.data?.reason ||
     "Scoring failed.";
   const showReport = done && result && result.status !== "error";
+  const [targetChoice, setTargetChoice] = useTargetChoice();
+  const targets = availableTargets(result ? [result] : []);
+  const target = resolveTarget(targetChoice, targets);
 
   // `reset` only clears the JOB. The two File objects live here, so without
   // this the upload card came back with the previous CV and paper still
@@ -104,7 +109,13 @@ export default function StudentDashboard() {
                   Score another
                 </Button>
               </div>
-              <ReportCard result={result} variant="student" />
+              <TargetSelector
+                className="mb-4"
+                value={target}
+                onChange={setTargetChoice}
+                available={targets}
+              />
+              <ReportCard result={result} variant="student" target={target} />
             </motion.div>
           )}
 

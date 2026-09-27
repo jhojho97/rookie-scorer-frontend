@@ -2,6 +2,7 @@
 import { Wrench } from "lucide-react";
 import type { TopFactor } from "@/types";
 import { splitFactors, factorAdvice } from "@/lib/factors";
+import { displayValue, variableHelp } from "@/lib/variables";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Row({ f, advice }: { f: TopFactor; advice: string | null }) {
@@ -16,11 +17,14 @@ function Row({ f, advice }: { f: TopFactor; advice: string | null }) {
           <span className="text-sm font-medium">{f.label}</span>
           {/* The candidate's own value, not the SHAP contribution — the dot
               already carries whether it helped or hurt. */}
-          {f.value != null && (
-            <span className="tnum shrink-0 text-xs text-muted-foreground">{String(f.value)}</span>
+          {displayValue(f) != null && (
+            <span className="tnum shrink-0 text-xs text-muted-foreground">{displayValue(f)}</span>
           )}
         </div>
-        {advice && <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{advice}</p>}
+        {variableHelp(f) && (
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{variableHelp(f)}</p>
+        )}
+        {advice && <p className="mt-1 text-xs leading-snug text-foreground/80">{advice}</p>}
       </div>
     </li>
   );

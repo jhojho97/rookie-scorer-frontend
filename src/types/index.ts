@@ -67,8 +67,28 @@ export interface Cost {
   breakdown: CostBreakdownItem[];
 }
 
+/**
+ * The part of a result that depends on the research-productivity target.
+ * The same fields appear at the top level of PredictionResult, holding the
+ * default (5%) target's values, so clients that predate per-target results
+ * keep working unchanged.
+ */
+export interface TargetResult {
+  prediction: number;
+  baseline: number;
+  percentile?: number | null;
+  cohort_n?: number;
+  sets_used: string[];
+  sets_skipped?: string[];
+  set_predictions?: Partial<Record<"C" | "D" | "E", number>>;
+  top_factors: TopFactor[];
+}
+
 /** The shape returned by POST /predict (and each item in a batch result). */
 export interface PredictionResult {
+  /** Every target's result, keyed by target (e.g. "pub_w_top_10pct"). Absent
+   *  on results from servers or saved batches that predate it. */
+  targets?: Partial<Record<string, TargetResult>>;
   target: string;
   prediction: number; // 0..1
   baseline: number; // 0..1

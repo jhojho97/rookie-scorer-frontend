@@ -13,7 +13,9 @@ import { UsageDashboard } from "@/components/UsageDashboard";
 import { ErrorBanner } from "@/components/ErrorBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { downloadCsv, resultsToCsv } from "@/lib/csv";
+import { downloadWorkbook } from "@/lib/export";
+import { availableTargets, resolveTarget } from "@/lib/targets";
+import { TargetSelector, useTargetChoice } from "@/components/TargetSelector";
 import { fmtUsd } from "@/lib/format";
 import { loadBatches, deleteBatch, RETENTION_DAYS, type BatchRecord } from "@/lib/history";
 
@@ -42,6 +44,11 @@ export default function HrDashboard() {
   const succeeded = job.data?.status === "done";
   // Results stream in as each candidate finishes, so show them while running.
   const results = viewing ? viewing.results : (job.data?.results ?? []);
+  // Target to view at: the viewer's choice when this batch has it, otherwise
+  // the default (older saved batches only carry the 5% result).
+  const [targetChoice, setTargetChoice] = useTargetChoice();
+  const targets = availableTargets(results);
+  const target = resolveTarget(targetChoice, targets);
   const finished = succeeded || failed;
 
   function onSubmit() {
@@ -89,9 +96,10 @@ export default function HrDashboard() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => downloadCsv("candidate_scores.csv", resultsToCsv(results))}
+                onClick={() => downloadWorkbook(results, "candidate_scores.xlsx")}
+                title="Excel workbook with one tab per target, each ranked for that target"
               >
-                <Download className="h-4 w-4" /> Export CSV
+                <Download className="h-4 w-4" /> Export Excel
               </Button>
             )}
             <Button variant="subtle" size="sm" onClick={onReset}>
@@ -194,14 +202,19 @@ export default function HrDashboard() {
           {/* Partial results appear while the rest are still scoring. */}
           {results.length > 0 && (
             <Card>
-              <CardHeader>
+              <CardHeader className="space-y-3">
                 <CardTitle>
                   {viewing ? "Saved batch" : running ? "Results so far" : "Results"} ·{" "}
                   {results.length} candidate{results.length === 1 ? "" : "s"} · {fmtUsd(costUsd)}
                 </CardTitle>
+                <p className="text-xs leading-snug text-muted-foreground">
+                  Candidates ranked by their score for the selected target. Select a candidate to
+                  open their report.
+                </p>
+                <TargetSelector value={target} onChange={setTargetChoice} available={targets} />
               </CardHeader>
               <CardContent>
-                <CandidateTable results={results} onSelect={setSelected} />
+                <CandidateTable results={results} onSelect={setSelected} target={target} />
               </CardContent>
             </Card>
           )}
@@ -280,7 +293,7 @@ export default function HrDashboard() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <ReportCard result={selected} variant="reviewer" />
+            <ReportCard result={selected} variant="reviewer" target={target} />
           </div>
         </div>
       )}
