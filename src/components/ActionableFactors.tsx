@@ -69,9 +69,7 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
           </p>
           <p>
             The levers are chosen using SHAP values, which measure how much each factor pushed
-            this score up or down. They are the factors within your control that lowered your
-            score the most, strongest first; factors that already raised it are listed under
-            Outstanding areas.
+            this score up or down.
           </p>
         </div>
 
