@@ -208,8 +208,8 @@ export default function HrDashboard() {
                   {results.length} candidate{results.length === 1 ? "" : "s"} · {fmtUsd(costUsd)}
                 </CardTitle>
                 <p className="text-xs leading-snug text-muted-foreground">
-                  Candidates ranked by their score for the selected target. Select a candidate to
-                  open their report.
+                  Candidates ranked by their score for the selected target. Candidates without a
+                  job-market paper are ranked separately. Select a candidate to open their report.
                 </p>
                 <TargetSelector value={target} onChange={setTargetChoice} available={targets} />
               </CardHeader>

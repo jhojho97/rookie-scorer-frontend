@@ -11,7 +11,7 @@ import type { PredictionResult } from "@/types";
  *    computed from an almost empty profile. Ranked beside real candidates it
  *    reads as "this person is weak" when the truth is "we could not see them".
  *
- * Both are kept out of the ranked table, its rank numbers and the CSV, and are
+ * Both are kept out of the ranked tables, their rank numbers and the export, and are
  * listed separately with the reason, so nobody is compared on a number that
  * does not describe them and nobody silently drops out of the batch either.
  */
@@ -60,19 +60,32 @@ export function splitResults(results: PredictionResult[]) {
 }
 
 /**
- * The number candidates are ranked on: the score shown, which is the model's
- * probability of reaching the chosen target (0-1, displayed 0-100).
+ * Scored candidates split by whether a job-market paper was used.
  *
- * Ranking on the displayed number keeps the batch order consistent with what
- * the reader sees. Note that a CV-only probability averages two models and a
- * with-paper one three, so the two sit on slightly different scales (typical
- * values 0.200 vs 0.220); candidates without a paper carry a "No JMP" tag.
+ * A CV-only score averages two models (C, D) and a with-paper score three
+ * (C, D, E), so the two sit on different scales: removing the paper moves a
+ * held-out 2018 candidate's score by a median of +4.5 points at the top 5%
+ * target and -2.5 at the top 30%. Ranked in one list, that shift would decide
+ * places, so each group is ranked only against itself. Results saved before
+ * `paper_used` existed count as with-paper.
+ */
+export function paperGroups(scored: PredictionResult[]) {
+  const withPaper: PredictionResult[] = [];
+  const cvOnly: PredictionResult[] = [];
+  for (const r of scored) (r.paper_used === false ? cvOnly : withPaper).push(r);
+  return { withPaper, cvOnly };
+}
+
+/**
+ * The number candidates are ranked on: the score shown, which is the model's
+ * probability of reaching the chosen target (0-1, displayed 0-100). Only
+ * compare it within one paperGroups() group.
  */
 export const rankValue = (r: PredictionResult) =>
   typeof r.prediction === "number" ? r.prediction : -1;
 
 /**
- * Position within the batch among SCORED candidates only, best first.
+ * Position among the candidates passed in (one paperGroups() group), best first.
  * Competition style: ties share a rank (1, 2, 2, 4).
  */
 export function rankScored(scored: PredictionResult[]): Map<PredictionResult, number> {

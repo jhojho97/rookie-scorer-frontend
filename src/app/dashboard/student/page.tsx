@@ -97,6 +97,9 @@ export default function StudentDashboard() {
                   coldStart={coldStart}
                   unit="profile"
                   label="Scoring your profile"
+                  // Measured 27 Sep 2026: ~60s with a paper (the paper is embedded
+                  // too), ~32s CV only; almost all of it is the CV extraction.
+                  expectedSeconds={jmp ? 60 : 32}
                 />
               </CardContent>
             </Card>
