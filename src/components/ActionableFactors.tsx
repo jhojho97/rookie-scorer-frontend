@@ -36,14 +36,20 @@ const cnTone = (v: number) =>
 /**
  * Turns the SHAP factor list into something a candidate can act on.
  *
- * Only the levers are shown: factors the candidate controls, each with a tip.
- * The "Fixed context" and "Your paper" groups were removed -- neither gave the
- * candidate anything to do, and the strongest of those factors already appear
- * under Outstanding and Lagging areas.
+ * Only the levers are shown: factors the candidate controls that LOWERED the
+ * score, each with a tip. Factors that already raised the score are strengths
+ * (they appear under Outstanding areas), not things to fix. The "Fixed context"
+ * and "Your paper" groups were removed -- neither gave the candidate anything
+ * to do, and the strongest of those factors already appear under Outstanding
+ * and Lagging areas.
  */
 export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
   // Factors arrive sorted by |contribution|, so slicing takes the strongest.
-  const levers = splitFactors(factors).actionable.slice(0, 5);
+  // Drawn from every factor that lowered the score (the API returns all of
+  // them), so a lever can sit just below the five shown under Lagging areas.
+  const levers = splitFactors(factors)
+    .actionable.filter((f) => f.contribution < 0)
+    .slice(0, 5);
   if (!factors.length) return null;
 
   return (
@@ -63,9 +69,9 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
           </p>
           <p>
             The levers are chosen using SHAP values, which measure how much each factor pushed
-            this score up or down. They are the factors within your control that had the largest
-            effect, strongest first. A green dot means the factor raised the score; red means it
-            lowered it.
+            this score up or down. They are the factors within your control that lowered your
+            score the most, strongest first; factors that already raised it are listed under
+            Outstanding areas.
           </p>
         </div>
 
@@ -82,7 +88,7 @@ export function ActionableFactors({ factors }: { factors: TopFactor[] }) {
           </section>
         ) : (
           <p className="text-sm text-muted-foreground">
-            None of the factors that shaped this score are ones you can change directly, such as
+            None of the factors that lowered this score are ones you can change directly, such as
             publications, R&amp;Rs or presentations.
           </p>
         )}
