@@ -34,8 +34,8 @@ export default function LandingPage() {
             Research Productivity Prediction
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-balance text-muted-foreground">
-            Upload a CV and job-market paper. Get a productivity score, a transparent
-            SHAP breakdown of what drove it, and the exact API cost — in one professional report.
+            Upload your CV and job-market paper to get a professional report on your research
+            productivity.
           </p>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
