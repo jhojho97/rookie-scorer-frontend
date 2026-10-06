@@ -10,6 +10,9 @@ import { Spinner } from "@/components/ui/misc";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { authErrorMessage } from "@/lib/authError";
 
+/** Where users can reach the team; shown under the sign-in form. */
+const CONTACT_EMAIL = "bxk127@gmail.com";
+
 export default function LoginPage() {
   const { login, user, devMode } = useAuth();
   const router = useRouter();
@@ -45,6 +48,12 @@ export default function LoginPage() {
           <Link href="/register" className="font-medium text-accent hover:underline">
             Create one
           </Link>
+          <p className="mt-2 text-xs">
+            Questions or feedback? Contact us at{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-accent hover:underline">
+              {CONTACT_EMAIL}
+            </a>
+          </p>
         </>
       }
     >
