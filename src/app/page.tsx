@@ -3,6 +3,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, GraduationCap, LineChart, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CONTACT_EMAIL } from "@/lib/contact";
 
 export default function LandingPage() {
   return (
@@ -57,6 +58,12 @@ export default function LandingPage() {
             <Link href="/login" className="font-medium text-accent hover:underline">
               Sign in <ArrowRight className="inline h-3 w-3" />
             </Link>
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Questions or feedback? Contact us at{" "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-accent hover:underline">
+              {CONTACT_EMAIL}
+            </a>
           </p>
         </motion.div>
       </main>

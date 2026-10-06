@@ -9,9 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/misc";
 import { PasswordField } from "@/components/auth/PasswordField";
 import { authErrorMessage } from "@/lib/authError";
-
-/** Where users can reach the team; shown under the sign-in form. */
-const CONTACT_EMAIL = "bxk127@gmail.com";
+import { CONTACT_EMAIL } from "@/lib/contact";
 
 export default function LoginPage() {
   const { login, user, devMode } = useAuth();
