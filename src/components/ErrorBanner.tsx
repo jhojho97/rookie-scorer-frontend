@@ -2,10 +2,21 @@
 import { AlertTriangle, Clock } from "lucide-react";
 import { ApiError } from "@/services/api";
 
+/**
+ * The browser's own wording when a request never reached a server (Chrome and
+ * Edge, Firefox, Safari). Callers often re-wrap errors as plain Error(message),
+ * so this matches the text rather than the TypeError class.
+ */
+const NETWORK_FAILURE = /failed to fetch|networkerror|load failed|network request failed/i;
+
+export const NETWORK_MESSAGE =
+  "Couldn't reach the scoring service. Check your internet connection, then try again.";
+
 /** Friendly inline error, with a special cold-start hint for 504/timeouts. */
 export function ErrorBanner({ error }: { error: unknown }) {
   const isCold = error instanceof ApiError && (error.coldStart || error.status === 504);
-  const msg = error instanceof Error ? error.message : "Something went wrong.";
+  const raw = error instanceof Error ? error.message : "Something went wrong.";
+  const msg = NETWORK_FAILURE.test(raw) ? NETWORK_MESSAGE : raw;
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4 text-sm">
       {isCold ? (

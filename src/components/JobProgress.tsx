@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Loader2, Moon } from "lucide-react";
+import { Loader2, Moon, WifiOff } from "lucide-react";
 
 /** Extra time the free-tier backend takes to wake from sleep, measured ~50s. */
 const COLD_START_SECONDS = 50;
@@ -32,6 +32,7 @@ export function JobProgress({
   done,
   total,
   coldStart,
+  offline,
   unit = "candidate",
   label,
   expectedSeconds = 60,
@@ -39,6 +40,8 @@ export function JobProgress({
   done: number;
   total: number;
   coldStart?: boolean;
+  /** The browser is offline, so requests are paused until it reconnects. */
+  offline?: boolean;
   unit?: string;
   /** Heading shown for a single item. Defaults to the unit. */
   label?: string;
@@ -50,11 +53,13 @@ export function JobProgress({
   // Time since this progress view appeared, for the single-item estimate.
   const [start] = useState(() => Date.now());
   const [now, setNow] = useState(start);
+  // Offline, nothing is happening, so the estimate holds still rather than
+  // creeping towards 95% as if scoring were under way.
   useEffect(() => {
-    if (countable) return;
+    if (countable || offline) return;
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
-  }, [countable]);
+  }, [countable, offline]);
 
   const expected = expectedSeconds + (coldStart ? COLD_START_SECONDS : 0);
   const pct = countable
@@ -85,7 +90,15 @@ export function JobProgress({
         />
       </div>
 
-      {coldStart ? (
+      {offline ? (
+        <p role="status" className="flex items-start gap-1.5 text-sm text-negative">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            You&apos;re offline. Scoring is paused and will carry on by itself when your
+            connection returns.
+          </span>
+        </p>
+      ) : coldStart ? (
         <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
           <Moon className="mt-0.5 h-4 w-4 shrink-0" />
           <span>

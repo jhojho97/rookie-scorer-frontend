@@ -20,7 +20,7 @@ import { fmtUsd } from "@/lib/format";
 import { loadBatches, deleteBatch, RETENTION_DAYS, type BatchRecord } from "@/lib/history";
 
 export default function HrDashboard() {
-  const { submit, job, reset, progress, running, coldStart } = useBatchJob();
+  const { submit, job, reset, progress, running, coldStart, offline, pollError } = useBatchJob();
   const [rows, setRows] = useState<CandidateInput[]>([emptyRow(), emptyRow()]);
   const [archive, setArchive] = useState<File | null>(null);
   const [selected, setSelected] = useState<PredictionResult | null>(null);
@@ -40,7 +40,7 @@ export default function HrDashboard() {
   const validCount = archive ? 0 : stagedCount;
   const canSubmit = Boolean(archive) || validCount > 0;
 
-  const failed = submit.isError || job.isError || job.data?.status === "error";
+  const failed = submit.isError || !!pollError || job.data?.status === "error";
   const succeeded = job.data?.status === "done";
   // Results stream in as each candidate finishes, so show them while running.
   const results = viewing ? viewing.results : (job.data?.results ?? []);
@@ -74,7 +74,7 @@ export default function HrDashboard() {
 
   const errorMsg =
     (submit.error as Error | undefined)?.message ||
-    (job.error as Error | undefined)?.message ||
+    pollError?.message ||
     job.data?.reason ||
     "Batch scoring failed.";
 
@@ -194,6 +194,7 @@ export default function HrDashboard() {
                   done={progress.done}
                   total={progress.total}
                   coldStart={coldStart}
+                  offline={offline}
                 />
               </CardContent>
             </Card>

@@ -22,15 +22,17 @@ import { Button } from "@/components/ui/button";
  */
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { submit, job, reset, progress, running, coldStart } = useBatchJob();
+  const { submit, job, reset, progress, running, coldStart, offline, pollError } = useBatchJob();
   const [cv, setCv] = useState<File | null>(null);
   const [jmp, setJmp] = useState<File | null>(null);
 
   const done = job.data?.status === "done";
   const result = job.data?.results?.[0];
-  const failed = submit.isError || job.data?.status === "error" || result?.status === "error";
+  const failed =
+    submit.isError || !!pollError || job.data?.status === "error" || result?.status === "error";
   const failMsg =
     (submit.error as Error | undefined)?.message ||
+    pollError?.message ||
     result?.reason ||
     job.data?.reason ||
     "Scoring failed.";
@@ -95,6 +97,7 @@ export default function StudentDashboard() {
                   done={progress.done}
                   total={progress.total}
                   coldStart={coldStart}
+                  offline={offline}
                   unit="profile"
                   label="Scoring your profile"
                   // Measured 27 Sep 2026: ~60s with a paper (the paper is embedded
