@@ -85,7 +85,10 @@ export function CandidateRows({
             value={r.name}
             disabled={disabled}
             onChange={(e) => update(r.id, { name: e.target.value })}
-            className="h-9"
+            // A long name ends in an ellipsis once the field loses focus; the
+            // full name stays readable on hover.
+            title={r.name || undefined}
+            className="h-9 min-w-0 text-ellipsis"
           />
           <FileSlot
             label="Upload CV"
